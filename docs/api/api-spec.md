@@ -26,52 +26,37 @@ POST /v1/chat/completions
 #### Request
 ```typescript
 interface ChatCompletionRequest {
-  // Обязательные параметры - один из двух:
+  // Обязательные параметры - один из двух (взаимоисключающие):
   messages?: Message[];        // Массив сообщений
   prompt?: string;            // Текстовый промпт (альтернатива messages)
 
   // Модель (если не указана, используется дефолтная)
   model?: string;              // Идентификатор модели (например, "gigachat/pro")
 
-  // Опциональные параметры
+  // Базовые параметры (поддерживаются всеми провайдерами)
   temperature?: number;       // Диапазон: [0.0, 2.0], по умолчанию 1.0
   max_tokens?: number;       // Максимальное количество токенов
   stream?: boolean;          // Включить streaming ответов
-  seed?: number;            // Seed для воспроизводимости результатов
+  repetition_penalty?: number; // Диапазон: (0, 2], штраф за повторения
+
+  // Дополнительные параметры (поддержка зависит от провайдера)
+  top_p?: number;           // Диапазон: (0, 1], поддерживается GigaChat
   
   // Параметры маршрутизации
   provider?: {
     order?: string[];        // Приоритет провайдеров
     allow_fallbacks?: boolean; // Разрешить фоллбэки
     require_parameters?: boolean; // Требовать поддержку всех параметров
-    data_collection?: "allow" | "deny"; // Политика сбора данных
   };
 
-  // Дополнительные параметры
+  // Function calling
   tools?: Tool[];           // Инструменты для function calling
   tool_choice?: "none" | "auto" | { type: "function"; function: { name: string } };
-  response_format?: {       // Формат ответа
+
+  // Формат ответа
+  response_format?: {
     type: "json_object" | "text"
   };
-
-  // Расширенные параметры
-  top_p?: number;          // Range: (0, 1]
-  top_k?: number;          // Range: [1, Infinity)
-  min_p?: number;          // Range: [0, 1]
-  top_a?: number;          // Range: [0, 1]
-  frequency_penalty?: number; // Range: [-2, 2]
-  presence_penalty?: number;  // Range: [-2, 2]
-  repetition_penalty?: number; // Range: (0, 2]
-  logit_bias?: { [key: number]: number };
-
-  // Оптимизация латентности
-  prediction?: {
-    type: "content";
-    content: string;
-  };
-
-  // Трансформации промптов
-  transforms?: string[];
 }
 
 interface Message {
@@ -185,8 +170,7 @@ interface ModelsResponse {
     default_parameters: {
       temperature: number;
       top_p: number;
-      frequency_penalty: number;
-      presence_penalty: number;
+      repetition_penalty: number;
     };
   }[];
 }
@@ -239,9 +223,8 @@ interface ParametersResponse {
     model: string;
     supported_parameters: string[];
     temperature_p50: number;
-    top_p_p50: number;
-    frequency_penalty_p50: number;
-    presence_penalty_p50: number;
+    top_p_p50?: number;
+    repetition_penalty_p50: number;
   };
 }
 ```
@@ -268,6 +251,20 @@ interface AuthKeyResponse {
   };
 }
 ```
+
+## Поддержка параметров провайдерами
+
+| Параметр | GigaChat | YandexGPT | Примечания |
+|----------|----------|-----------|------------|
+| temperature | ✅ | ✅ | |
+| max_tokens | ✅ | ✅ | |
+| stream | ✅ | ✅ | |
+| top_p | ✅ | ❌ | |
+| repetition_penalty | ✅ | ✅ | |
+| prompt | ✅* | ✅* | *Конвертируется в messages |
+| messages | ✅ | ✅ | |
+| tools | ✅ | ✅* | *Эмулируется через промпты |
+| tool_choice | ✅ | ✅* | *Эмулируется через промпты |
 
 ## Error Handling
 
