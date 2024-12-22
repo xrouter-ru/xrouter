@@ -1,7 +1,7 @@
 # XRouter Architecture Documentation
 
 ## Overview
-This directory contains comprehensive documentation about XRouter's system architecture, designed to provide a unified API for accessing various Russian LLM models (GigaChat, Yandex GPT, MTS, T-Bank).
+This directory contains comprehensive documentation about XRouter's system architecture, designed to provide a unified API for accessing various Russian LLM models (GigaChat, YandexGPT).
 
 ## Documentation Structure
 
@@ -16,15 +16,15 @@ This directory contains comprehensive documentation about XRouter's system archi
 - Provider adapters
 - API Gateway
 - Authentication & Authorization
-- Monitoring & Logging
+- Monitoring & Metrics
 - Database design
 
 ### 3. [Data Flow](./data-flow.md)
 - Request handling
 - Provider routing
 - Error handling
-- Fallback mechanisms
-- Caching strategies
+- Rate limiting
+- OAuth flow
 
 ### 4. [Deployment](./deployment.md)
 - Infrastructure requirements
@@ -35,49 +35,88 @@ This directory contains comprehensive documentation about XRouter's system archi
 ## Key Architectural Decisions
 
 ### 1. Technology Stack
-- **Backend**: Node.js with Express.js and TypeScript
+
+#### MVP Version
+- **Backend**: Python with FastAPI
 - **Database**: PostgreSQL for persistent storage
-- **Cache**: Redis for session management and caching
-- **API Gateway**: Nginx for load balancing and SSL termination
+- **Cache**: Redis for rate limiting
+- **API Gateway**: Nginx for SSL termination
 - **Monitoring**: Prometheus & Grafana
+
+#### Production Version
+- **Backend**: Go with standard library
+- **Database**: PostgreSQL with HA
+- **Cache**: Redis Cluster
+- **API Gateway**: Kubernetes Ingress
+- **Monitoring**: Prometheus & Grafana stack
 
 ### 2. Core Principles
 - Provider-agnostic API design
-- Fault tolerance with fallback mechanisms
-- Scalable microservices architecture
+- OpenAI-compatible interface
+- Transparent pricing and token counting
 - Secure by design
-- Comprehensive monitoring and logging
+- Comprehensive monitoring
 
 ### 3. Integration Patterns
-- REST API with OpenAI-compatible endpoints
-- WebSocket support for streaming responses
-- OAuth 2.0 with PKCE for authentication
-- Rate limiting and quota management
+- REST API with OpenAI compatibility
+- OAuth 2.0 with PKCE (1 year tokens)
+- Rate limiting per API key
+- Prometheus metrics export
 
 ## Development Guidelines
 
-### Code Organization
+### MVP Code Organization (Python)
 ```
 src/
-├── api/            # API routes and controllers
+├── api/            # FastAPI routes
 ├── core/           # Core business logic
-├── providers/      # Provider-specific adapters
-├── models/         # Data models and schemas
+├── providers/      # Provider adapters
+├── models/         # Pydantic models
 ├── services/       # Shared services
-├── utils/          # Utility functions
-└── config/         # Configuration management
+└── config/         # Configuration
+```
+
+### Production Code Organization (Go)
+```
+cmd/
+├── gateway/        # API Gateway service
+└── router/         # Router service
+pkg/
+├── api/           # API handlers
+├── core/          # Core business logic
+├── providers/     # Provider adapters
+├── models/        # Data models
+└── config/        # Configuration
 ```
 
 ### Key Interfaces
-- Provider Adapter Interface
-- Model Router Interface
-- Authentication Provider Interface
-- Monitoring Interface
+
+#### MVP (Python)
+```python
+class ProviderAdapter(Protocol):
+    async def complete(self, request: ChatRequest) -> ChatResponse: ...
+    async def validate_api_key(self, key: str) -> bool: ...
+
+class Router(Protocol):
+    async def route_request(self, request: ChatRequest) -> ChatResponse: ...
+```
+
+#### Production (Go)
+```go
+type Provider interface {
+    Complete(context.Context, *ChatRequest) (*ChatResponse, error)
+    ValidateAPIKey(context.Context, string) (bool, error)
+}
+
+type Router interface {
+    RouteRequest(context.Context, *ChatRequest) (*ChatResponse, error)
+}
+```
 
 ## Next Steps
-1. Review and validate the architectural design
-2. Set up development environment
-3. Implement core components
-4. Develop provider adapters
-5. Set up monitoring and logging
-6. Deploy initial version
+1. Implement MVP with Python/FastAPI
+2. Set up basic monitoring
+3. Deploy MVP version
+4. Start Go implementation
+5. Set up production infrastructure
+6. Migrate to Go version

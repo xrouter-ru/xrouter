@@ -1,11 +1,119 @@
 # XRouter Deployment Documentation
 
-## Infrastructure Overview
+## MVP Deployment (Python)
 
-### Production Environment
+### Infrastructure Overview
 ```mermaid
 graph TD
-    subgraph Cloud Infrastructure
+    subgraph MVP Infrastructure
+        Nginx[Nginx] --> FastAPI[FastAPI Service]
+        FastAPI --> Redis[(Redis)]
+        FastAPI --> DB[(PostgreSQL)]
+    end
+```
+
+### Requirements
+
+#### Hardware Requirements (Single Server)
+- CPU: 4 cores
+- RAM: 8GB
+- Storage: 100GB SSD
+- Network: 100Mbps
+
+#### Software Requirements
+```yaml
+infrastructure:
+  python: "3.11+"
+  nginx: "1.25+"
+  
+databases:
+  postgresql: "15+"
+  redis: "7.0+"
+  
+monitoring:
+  prometheus: "2.45+"
+  grafana: "10.0+"
+```
+
+### Deployment Process
+
+#### 1. System Setup
+```bash
+# Update system
+sudo apt update && sudo apt upgrade
+
+# Install dependencies
+sudo apt install python3.11 python3.11-venv nginx redis postgresql
+```
+
+#### 2. Application Setup
+```bash
+# Create virtual environment
+python3.11 -m venv venv
+source venv/bin/activate
+
+# Install requirements
+pip install -r requirements.txt
+
+# Setup environment
+cp .env.example .env
+vim .env  # Configure environment variables
+```
+
+#### 3. Database Setup
+```bash
+# Create database
+sudo -u postgres createdb xrouter
+sudo -u postgres psql -d xrouter -f schema.sql
+
+# Configure connection
+vim .env  # Update DATABASE_URL
+```
+
+#### 4. Service Setup
+```bash
+# Create systemd service
+sudo vim /etc/systemd/system/xrouter.service
+
+[Unit]
+Description=XRouter Service
+After=network.target
+
+[Service]
+User=xrouter
+WorkingDirectory=/opt/xrouter
+Environment=PATH=/opt/xrouter/venv/bin
+ExecStart=/opt/xrouter/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+# Start service
+sudo systemctl enable xrouter
+sudo systemctl start xrouter
+```
+
+#### 5. Nginx Setup
+```nginx
+server {
+    listen 80;
+    server_name api.xrouter.ru;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+## Production Deployment (Go)
+
+### Infrastructure Overview
+```mermaid
+graph TD
+    subgraph Production Infrastructure
         LB[Load Balancer] --> API1[API Gateway 1]
         LB --> API2[API Gateway 2]
         
@@ -17,47 +125,28 @@ graph TD
         Router1 --> Cache[(Redis Cluster)]
         Router2 --> Cache
         
-        Router1 --> DB[(PostgreSQL)]
+        Router1 --> DB[(PostgreSQL HA)]
         Router2 --> DB
         
-        Router1 --> Monitor[Monitoring Stack]
+        Router1 --> Monitor[Prometheus + Grafana]
         Router2 --> Monitor
     end
 ```
 
-## Deployment Requirements
+### Requirements
 
-### Hardware Requirements
-- **API Gateway**:
-  - CPU: 4 cores minimum
-  - RAM: 8GB minimum
-  - Storage: 50GB SSD
-  - Network: 1Gbps
+#### Hardware Requirements (Per Node)
+- **API Gateway**: 4 cores, 8GB RAM
+- **Router Service**: 8 cores, 16GB RAM
+- **Database**: 8 cores, 32GB RAM
+- **Cache**: 4 cores, 16GB RAM
 
-- **Router Service**:
-  - CPU: 8 cores minimum
-  - RAM: 16GB minimum
-  - Storage: 100GB SSD
-  - Network: 1Gbps
-
-- **Database**:
-  - CPU: 8 cores minimum
-  - RAM: 32GB minimum
-  - Storage: 500GB SSD
-  - Network: 1Gbps
-
-- **Cache**:
-  - CPU: 4 cores minimum
-  - RAM: 16GB minimum
-  - Storage: 100GB SSD
-  - Network: 1Gbps
-
-### Software Requirements
+#### Software Requirements
 ```yaml
 infrastructure:
+  golang: "1.21+"
   kubernetes: "1.25+"
   docker: "24.0+"
-  nginx: "1.25+"
   
 databases:
   postgresql: "15+"
@@ -66,16 +155,11 @@ databases:
 monitoring:
   prometheus: "2.45+"
   grafana: "10.0+"
-  elasticsearch: "8.0+"
-  
-security:
-  certManager: "1.12+"
-  vault: "1.13+"
 ```
 
-## Deployment Process
+### Deployment Process
 
-### 1. Infrastructure Setup
+#### 1. Infrastructure Setup
 ```bash
 # Initialize Terraform
 terraform init
@@ -83,23 +167,22 @@ terraform init
 # Create infrastructure
 terraform apply -var-file=prod.tfvars
 
-# Configure DNS
-kubectl apply -f k8s/ingress/
+# Setup Kubernetes
+kubectl apply -f k8s/namespace.yaml
 ```
 
-### 2. Database Setup
+#### 2. Database Setup
 ```bash
-# Deploy PostgreSQL
-helm install postgresql bitnami/postgresql -f values-postgresql.yaml
+# Deploy PostgreSQL HA
+helm install postgresql bitnami/postgresql-ha \
+  --values postgresql-values.yaml
 
-# Deploy Redis
-helm install redis bitnami/redis -f values-redis.yaml
-
-# Initialize schemas
-kubectl apply -f k8s/jobs/db-init/
+# Deploy Redis Cluster
+helm install redis bitnami/redis-cluster \
+  --values redis-values.yaml
 ```
 
-### 3. Core Services Deployment
+#### 3. Application Deployment
 ```bash
 # Deploy API Gateway
 kubectl apply -f k8s/api-gateway/
@@ -107,83 +190,87 @@ kubectl apply -f k8s/api-gateway/
 # Deploy Router Service
 kubectl apply -f k8s/router-service/
 
-# Deploy Provider Manager
-kubectl apply -f k8s/provider-manager/
+# Deploy monitoring
+kubectl apply -f k8s/monitoring/
 ```
 
-### 4. Monitoring Setup
-```bash
-# Deploy Prometheus
-helm install prometheus prometheus-community/prometheus -f values-prometheus.yaml
+### High Availability
 
-# Deploy Grafana
-helm install grafana grafana/grafana -f values-grafana.yaml
-
-# Deploy ELK Stack
-helm install elastic elastic/elasticsearch -f values-elastic.yaml
-```
-
-## Scaling Strategy
-
-### Horizontal Scaling
+#### Database HA
 ```yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: router-service-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: router-service
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-```
+postgresql-ha:
+  replicaCount: 3
+  postgresql:
+    replication:
+      synchronousCommit: "on"
+      numSynchronousReplicas: 1
 
-### Vertical Scaling
-- Monitor resource usage
-- Adjust resource limits based on usage patterns
-- Use node pools with different resource configurations
-
-## High Availability
-
-### Database HA
-```yaml
-postgresql:
-  replication:
-    enabled: true
-    slaveReplicas: 2
-    synchronousCommit: "on"
-    numSynchronousReplicas: 1
-```
-
-### Cache HA
-```yaml
-redis:
+redis-cluster:
   cluster:
-    enabled: true
-    slaveCount: 2
-  sentinel:
-    enabled: true
-    quorum: 2
+    nodes: 6
+    replicas: 1
 ```
 
-### Service HA
-- Multiple replicas across availability zones
-- Liveness and readiness probes
-- Circuit breakers and fallbacks
-- Regular backup and disaster recovery
+#### Service HA
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: router-service
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+  template:
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+```
 
-## Security Measures
+### Monitoring
 
-### Network Security
+#### Prometheus Configuration
+```yaml
+prometheus:
+  scrape_configs:
+    - job_name: 'xrouter'
+      kubernetes_sd_configs:
+        - role: pod
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_label_app]
+          regex: xrouter
+          action: keep
+```
+
+#### Grafana Dashboards
+- Request Rate and Latency
+- Error Rate by Provider
+- Token Usage
+- Resource Utilization
+
+### Backup Strategy
+
+#### Database Backup
+```bash
+# Automated backup script
+#!/bin/bash
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/backups/postgresql"
+
+# Backup PostgreSQL
+pg_dumpall -U postgres > "$BACKUP_DIR/full_backup_$TIMESTAMP.sql"
+
+# Rotate backups (keep last 7 days)
+find $BACKUP_DIR -type f -mtime +7 -delete
+```
+
+### Security
+
+#### Network Policies
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -201,129 +288,16 @@ spec:
     - podSelector:
         matchLabels:
           app: api-gateway
-    ports:
-    - protocol: TCP
-      port: 8080
 ```
 
-### Secret Management
+#### Secret Management
 ```yaml
-apiVersion: secrets-store.csi.x-k8s.io/v1
-kind: SecretProviderClass
+apiVersion: v1
+kind: Secret
 metadata:
-  name: vault-provider
-spec:
-  provider: vault
-  parameters:
-    vaultAddress: "https://vault:8200"
-    roleName: "router-service"
-    objects: |
-      - objectName: "api-keys"
-        secretPath: "secret/data/router-service/api-keys"
-```
-
-## Monitoring Setup
-
-### Prometheus Configuration
-```yaml
-prometheus:
-  scrape_configs:
-    - job_name: 'router-service'
-      kubernetes_sd_configs:
-        - role: pod
-      relabel_configs:
-        - source_labels: [__meta_kubernetes_pod_label_app]
-          regex: router-service
-          action: keep
-```
-
-### Grafana Dashboards
-```yaml
-grafana:
-  dashboards:
-    default:
-      router-overview:
-        file: dashboards/router-overview.json
-      provider-metrics:
-        file: dashboards/provider-metrics.json
-```
-
-## Backup Strategy
-
-### Database Backups
-```bash
-# Automated backup script
-#!/bin/bash
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/backups/postgresql"
-
-# Backup PostgreSQL
-pg_dump -Fc -f "$BACKUP_DIR/db_backup_$TIMESTAMP.dump"
-
-# Upload to object storage
-aws s3 cp "$BACKUP_DIR/db_backup_$TIMESTAMP.dump" \
-    "s3://xrouter-backups/postgresql/"
-```
-
-### Configuration Backups
-- Git-based configuration management
-- Regular exports of custom resources
-- Backup of Kubernetes secrets
-
-## Maintenance Procedures
-
-### Rolling Updates
-```bash
-# Update API Gateway
-kubectl set image deployment/api-gateway \
-    api-gateway=xrouter/api-gateway:new-version --record
-
-# Monitor rollout
-kubectl rollout status deployment/api-gateway
-```
-
-### Database Maintenance
-```sql
--- Regular maintenance tasks
-VACUUM ANALYZE;
-REINDEX DATABASE xrouter;
-```
-
-### Health Checks
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8080
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /ready
-    port: 8080
-  initialDelaySeconds: 5
-  periodSeconds: 5
-```
-
-## Disaster Recovery
-
-### Recovery Procedures
-1. Assess the impact and identify affected components
-2. Restore from latest backup if data loss occurred
-3. Review and update affected configurations
-4. Verify system integrity and functionality
-5. Document incident and update procedures
-
-### Failover Process
-```mermaid
-sequenceDiagram
-    participant Primary
-    participant Secondary
-    participant LoadBalancer
-    
-    Primary->>Primary: Health Check Fails
-    Primary->>Secondary: Notify Failure
-    Secondary->>Secondary: Promote to Primary
-    Secondary->>LoadBalancer: Update Routes
-    LoadBalancer->>Secondary: Route Traffic
+  name: xrouter-secrets
+type: Opaque
+data:
+  db-password: <base64>
+  redis-password: <base64>
+  provider-keys: <base64>

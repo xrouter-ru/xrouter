@@ -1,294 +1,314 @@
 # XRouter Data Flow Documentation
 
-## Request Flow
+## MVP (Python)
 
-### 1. Client Request Processing
+### Request Flow
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Gateway as API Gateway
+    participant FastAPI as FastAPI Gateway
     participant Router as Router Service
     participant Provider as Provider Manager
-    participant Cache as Cache Service
+    participant Redis as Redis Cache
     
-    Client->>Gateway: Send Request
-    Gateway->>Gateway: Validate Request
-    Gateway->>Gateway: Authenticate
-    Gateway->>Router: Forward Request
-    Router->>Cache: Check Cache
-    alt Cache Hit
-        Cache-->>Router: Return Cached Response
-        Router-->>Gateway: Return Response
-        Gateway-->>Client: Return Response
-    else Cache Miss
+    Client->>FastAPI: Send Request
+    FastAPI->>FastAPI: Validate Request
+    FastAPI->>FastAPI: Authenticate
+    FastAPI->>Redis: Check Rate Limit
+    
+    alt Rate Limit OK
+        FastAPI->>Router: Forward Request
         Router->>Provider: Forward to Provider
         Provider->>Provider: Transform Request
         Provider->>LLM: Send to LLM
         LLM-->>Provider: LLM Response
         Provider->>Provider: Normalize Response
         Provider-->>Router: Return Response
-        Router->>Cache: Cache Response
-        Router-->>Gateway: Return Response
-        Gateway-->>Client: Return Response
+        Router-->>FastAPI: Return Response
+        FastAPI-->>Client: Return Response
+    else Rate Limit Exceeded
+        Redis-->>FastAPI: Limit Exceeded
+        FastAPI-->>Client: 429 Too Many Requests
     end
 ```
 
-### 2. Request Transformation
-```typescript
-interface ClientRequest {
-  model: string;
-  messages: Message[];
-  parameters: ModelParameters;
-  stream?: boolean;
-}
+### Implementation Details
+```python
+# FastAPI Gateway
+from fastapi import FastAPI, HTTPException
+from redis import Redis
 
-interface ProviderRequest {
-  prompt: string;
-  max_tokens: number;
-  temperature: number;
-  provider_specific_params: Record<string, any>;
-}
+app = FastAPI()
+redis = Redis()
 
-// Transformation Process
-function transformRequest(request: ClientRequest, provider: Provider): ProviderRequest {
-  return {
-    prompt: formatPrompt(request.messages),
-    max_tokens: calculateMaxTokens(request.parameters),
-    temperature: request.parameters.temperature ?? provider.defaults.temperature,
-    provider_specific_params: mapProviderParams(request.parameters, provider)
-  };
-}
-```
-
-## Response Flow
-
-### 1. Standard Response Processing
-```mermaid
-sequenceDiagram
-    participant LLM as LLM Provider
-    participant Provider as Provider Manager
-    participant Router as Router Service
-    participant Cache as Cache Service
-    participant Client
+@app.post("/v1/chat/completions")
+async def chat_completions(request: ChatRequest):
+    # Rate limiting
+    if not check_rate_limit(request.api_key):
+        raise HTTPException(429)
     
-    LLM->>Provider: Raw Response
-    Provider->>Provider: Normalize Response
-    Provider->>Router: Normalized Response
-    Router->>Cache: Cache Response
-    Router->>Client: Return Response
-```
-
-### 2. Streaming Response Processing
-```mermaid
-sequenceDiagram
-    participant LLM as LLM Provider
-    participant Provider as Provider Manager
-    participant Router as Router Service
-    participant Client
+    # Authentication
+    if not validate_api_key(request.api_key):
+        raise HTTPException(401)
     
-    LLM->>Provider: Stream Chunk
-    Provider->>Provider: Normalize Chunk
-    Provider->>Router: Forward Chunk
-    Router->>Client: Stream Chunk
-    Note over LLM,Client: Repeat until stream ends
+    # Route request
+    response = await router.process_request(request)
+    return response
+
+# Router Service
+class RouterService:
+    async def process_request(self, request: ChatRequest) -> ChatResponse:
+        provider = self.resolve_provider(request.model)
+        transformed = provider.transform_request(request)
+        response = await provider.execute(transformed)
+        return response
+
+# Provider Manager
+class ProviderManager:
+    async def execute(self, request: ProviderRequest) -> ProviderResponse:
+        if request.model.startswith('gigachat'):
+            return await self.gigachat_client.complete(request)
+        elif request.model.startswith('yandexgpt'):
+            return await self.yandex_client.complete(request)
 ```
 
-## Error Handling
+## Production (Go)
 
-### 1. Error Types
-```typescript
-interface ServiceError {
-  code: ErrorCode;
-  message: string;
-  details?: Record<string, any>;
-  retryable: boolean;
-}
-
-enum ErrorCode {
-  AUTHENTICATION_ERROR = 'auth_error',
-  VALIDATION_ERROR = 'validation_error',
-  PROVIDER_ERROR = 'provider_error',
-  RATE_LIMIT_ERROR = 'rate_limit_error',
-  INTERNAL_ERROR = 'internal_error'
-}
-```
-
-### 2. Error Flow
+### Request Flow
 ```mermaid
 sequenceDiagram
     participant Client
     participant Gateway as API Gateway
     participant Router as Router Service
     participant Provider as Provider Manager
-    participant Fallback as Fallback Provider
+    participant Redis as Redis Cache
+    participant DB as PostgreSQL
+    
+    Client->>Gateway: Send Request
+    Gateway->>Gateway: Validate Request
+    Gateway->>DB: Validate API Key
+    Gateway->>Redis: Check Rate Limit
+    
+    alt All Checks Pass
+        Gateway->>Router: Forward Request
+        Router->>Provider: Forward to Provider
+        Provider->>Provider: Transform Request
+        Provider->>LLM: Send to LLM
+        LLM-->>Provider: LLM Response
+        Provider->>Provider: Normalize Response
+        Provider-->>Router: Return Response
+        Router-->>Gateway: Return Response
+        Gateway-->>Client: Return Response
+    else Auth/Rate Limit Failed
+        Gateway-->>Client: Error Response
+    end
+```
+
+### Implementation Details
+```go
+// API Gateway
+type Gateway struct {
+    router  *Router
+    cache   *redis.Client
+    db      *sql.DB
+    metrics *prometheus.Client
+}
+
+func (g *Gateway) HandleRequest(w http.ResponseWriter, r *http.Request) {
+    // Validate request
+    if err := g.validateRequest(r); err != nil {
+        g.sendError(w, err)
+        return
+    }
+
+    // Check rate limit
+    if err := g.checkRateLimit(r); err != nil {
+        g.sendError(w, err)
+        return
+    }
+
+    // Process request
+    resp, err := g.router.ProcessRequest(r.Context(), r)
+    if err != nil {
+        g.sendError(w, err)
+        return
+    }
+
+    g.sendResponse(w, resp)
+}
+
+// Router Service
+type Router struct {
+    providers map[string]Provider
+    metrics   *prometheus.Client
+}
+
+func (r *Router) ProcessRequest(ctx context.Context, req *Request) (*Response, error) {
+    // Resolve provider
+    provider, err := r.resolveProvider(req.Model)
+    if err != nil {
+        return nil, err
+    }
+
+    // Transform and execute
+    transformed := provider.TransformRequest(req)
+    return provider.Execute(ctx, transformed)
+}
+
+// Provider Manager
+type Provider interface {
+    TransformRequest(*Request) *ProviderRequest
+    Execute(context.Context, *ProviderRequest) (*Response, error)
+}
+
+type GigaChatProvider struct {
+    client *gigachat.Client
+}
+
+type YandexGPTProvider struct {
+    client *yandexgpt.Client
+}
+```
+
+## Error Handling
+
+### Error Types
+```go
+type ErrorCode string
+
+const (
+    ErrAuthentication ErrorCode = "auth_error"
+    ErrValidation    ErrorCode = "validation_error"
+    ErrRateLimit     ErrorCode = "rate_limit_error"
+    ErrProvider      ErrorCode = "provider_error"
+    ErrInternal      ErrorCode = "internal_error"
+)
+
+type Error struct {
+    Code    ErrorCode
+    Message string
+    Details map[string]interface{}
+}
+```
+
+### Error Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway as API Gateway
+    participant Router as Router Service
+    participant Provider as Provider Manager
     
     Client->>Gateway: Request
     Gateway->>Router: Forward Request
     Router->>Provider: Process Request
     Provider->>Provider: Error Occurs
     Provider-->>Router: Return Error
-    
-    alt Retryable Error
-        Router->>Fallback: Retry with Fallback
-        Fallback-->>Router: Success Response
-        Router-->>Gateway: Return Response
-        Gateway-->>Client: Return Response
-    else Non-Retryable Error
-        Router-->>Gateway: Return Error
-        Gateway-->>Client: Return Error Response
-    end
+    Router-->>Gateway: Return Error
+    Gateway-->>Client: Error Response with Details
 ```
 
-## Fallback Mechanism
+## Monitoring
 
-### 1. Provider Fallback
-```typescript
-interface FallbackStrategy {
-  shouldFallback(error: ServiceError): boolean;
-  getFallbackProvider(currentProvider: Provider): Provider;
-  maxRetries: number;
-}
-
-class ProviderFallback {
-  async executeWithFallback(request: ClientRequest): Promise<Response> {
-    let attempts = 0;
-    let lastError: ServiceError;
-    
-    while (attempts < this.strategy.maxRetries) {
-      try {
-        const provider = this.getNextProvider(attempts);
-        return await provider.execute(request);
-      } catch (error) {
-        lastError = error;
-        if (!this.strategy.shouldFallback(error)) {
-          throw error;
-        }
-        attempts++;
-      }
-    }
-    
-    throw lastError;
-  }
+### Metrics Collection
+```go
+type Metrics interface {
+    RecordRequest(provider, model string)
+    RecordLatency(provider string, duration time.Duration)
+    RecordError(provider string, err error)
+    RecordTokens(provider string, input, output int)
 }
 ```
 
-### 2. Fallback Flow
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Router as Router Service
-    participant Primary as Primary Provider
-    participant Secondary as Secondary Provider
-    participant Tertiary as Tertiary Provider
-    
-    Client->>Router: Request
-    Router->>Primary: Try Primary
-    Primary-->>Router: Error
-    Router->>Secondary: Fallback to Secondary
-    Secondary-->>Router: Error
-    Router->>Tertiary: Fallback to Tertiary
-    Tertiary-->>Router: Success
-    Router->>Client: Response
-```
-
-## Caching Strategy
-
-### 1. Cache Levels
-```typescript
-interface CacheStrategy {
-  shouldCache(request: ClientRequest): boolean;
-  getCacheKey(request: ClientRequest): string;
-  getTTL(request: ClientRequest): number;
-}
-
-interface CacheEntry {
-  response: Response;
-  created: Date;
-  expires: Date;
-  metadata: CacheMetadata;
-}
-```
-
-### 2. Cache Flow
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Router as Router Service
-    participant Cache as Cache Service
-    participant Provider as Provider Manager
-    
-    Client->>Router: Request
-    Router->>Cache: Check Cache
-    alt Cache Hit
-        Cache-->>Router: Return Cached
-        Router-->>Client: Return Response
-    else Cache Miss
-        Router->>Provider: Forward Request
-        Provider-->>Router: Response
-        Router->>Cache: Store in Cache
-        Router-->>Client: Return Response
-    end
-```
-
-## Rate Limiting
-
-### 1. Rate Limit Implementation
-```typescript
-interface RateLimiter {
-  checkLimit(key: string): Promise<RateLimitResult>;
-  incrementUsage(key: string): Promise<void>;
-  resetUsage(key: string): Promise<void>;
-}
-
-interface RateLimitResult {
-  allowed: boolean;
-  remaining: number;
-  reset: Date;
-}
-```
-
-### 2. Rate Limit Flow
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Gateway as API Gateway
-    participant RateLimit as Rate Limiter
-    participant Router as Router Service
-    
-    Client->>Gateway: Request
-    Gateway->>RateLimit: Check Limits
-    alt Limit Exceeded
-        RateLimit-->>Gateway: Reject
-        Gateway-->>Client: 429 Too Many Requests
-    else Limit OK
-        RateLimit-->>Gateway: Accept
-        Gateway->>Router: Forward Request
-        Router-->>Client: Response
-    end
-```
-
-## Monitoring and Metrics
-
-### 1. Metric Collection
-```typescript
-interface MetricCollector {
-  recordLatency(operation: string, duration: number): void;
-  recordError(operation: string, error: ServiceError): void;
-  recordUsage(provider: string, tokens: number): void;
-  recordCacheHit(operation: string): void;
-  recordCacheMiss(operation: string): void;
-}
-```
-
-### 2. Metric Flow
+### Metric Flow
 ```mermaid
 sequenceDiagram
     participant Service
-    participant Metrics as Metric Collector
-    participant Prometheus
+    participant Metrics as Prometheus
     participant Grafana
     
     Service->>Metrics: Record Metric
-    Metrics->>Prometheus: Store Metric
-    Grafana->>Prometheus: Query Metrics
+    Grafana->>Metrics: Query Metrics
     Note over Grafana: Display Dashboard
+```
+
+## OAuth Flow
+
+### MVP OAuth (Python)
+```python
+from fastapi import FastAPI, Depends
+from fastapi.security import OAuth2AuthorizationCodeBearer
+from fastapi_oauth2 import OAuth2
+
+# OAuth2 configuration
+oauth2_scheme = OAuth2AuthorizationCodeBearer(
+    tokenUrl="token",
+    authorizationUrl="authorize"
+)
+
+@app.post("/token")
+async def token(code: str, code_verifier: str):
+    # Validate PKCE
+    if not validate_pkce(code, code_verifier):
+        raise HTTPException(400)
+    
+    # Generate token (1 year)
+    token = create_jwt_token(
+        user_id=user.id,
+        expires_delta=timedelta(days=365)
+    )
+    
+    return {"access_token": token}
+```
+
+### Production OAuth (Go)
+```go
+import (
+    "github.com/golang-jwt/jwt/v5"
+)
+
+type OAuthHandler struct {
+    db      *sql.DB
+    cache   *redis.Client
+}
+
+func (h *OAuthHandler) HandleToken(w http.ResponseWriter, r *http.Request) {
+    // Validate PKCE
+    code := r.FormValue("code")
+    verifier := r.FormValue("code_verifier")
+    
+    if !validatePKCE(code, verifier) {
+        http.Error(w, "Invalid code", 400)
+        return
+    }
+    
+    // Generate JWT (1 year)
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+        "sub": userID,
+        "exp": time.Now().AddDate(1, 0, 0).Unix(),
+    })
+    
+    tokenString, _ := token.SignedString(jwtSecret)
+    json.NewEncoder(w).Encode(map[string]string{
+        "access_token": tokenString,
+    })
+}
+```
+
+### OAuth Flow Diagram
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Auth as Auth Service
+    participant DB as Database
+    
+    Client->>Auth: Authorization Request + PKCE
+    Auth->>DB: Validate Client
+    DB-->>Auth: Client Valid
+    Auth-->>Client: Authorization Code
+    
+    Client->>Auth: Token Request + Code Verifier
+    Auth->>Auth: Validate PKCE
+    Auth->>Auth: Generate JWT (1 year)
+    Auth-->>Client: Access Token
+```

@@ -17,7 +17,6 @@ interface APIGateway {
 - Authentication and authorization
 - Rate limiting and quota management
 - Request logging and monitoring
-- Load balancing
 - SSL/TLS termination
 
 #### Dependencies
@@ -30,27 +29,28 @@ interface APIGateway {
 ### 2. Router Service
 ```typescript
 interface RouterService {
-  determineProvider(request: RoutingRequest): Promise<Provider>;
+  resolveProvider(model: string): Promise<Provider>;
   transformRequest(request: Request, provider: Provider): Promise<TransformedRequest>;
   handleResponse(response: ProviderResponse): Promise<NormalizedResponse>;
   handleError(error: ProviderError): Promise<Response>;
 }
 
-interface RoutingRequest {
-  model: string;
-  prompt: string;
-  parameters: ModelParameters;
-  preferences: ProviderPreferences;
+interface ModelInfo {
+  id: string;              // e.g. "gigachat-pro" или "yandexgpt-lite:latest"
+  provider: string;        // "gigachat" | "yandexgpt"
+  capabilities: {
+    contextLength: number;
+    maxTokens: number;
+    features: string[];    // ["streaming", "function-calling", "json-mode"]
+  };
 }
 ```
 
 #### Key Features
-- Provider selection logic
+- Model resolution to provider
 - Request transformation
 - Response normalization
-- Error handling and recovery
-- Load balancing between providers
-- Fallback management
+- Error handling
 
 #### Dependencies
 - Provider Manager
@@ -79,48 +79,46 @@ interface Provider {
 ```
 
 #### Provider Adapters
-Each LLM provider has a dedicated adapter implementing the Provider interface:
 
 ##### GigaChat Adapter
 ```typescript
 class GigaChatAdapter implements Provider {
   capabilities: {
-    maxTokens: 4096,
-    supportedModels: ['GigaChat', 'GigaChat-Pro'],
-    features: ['streaming', 'function-calling']
+    maxTokens: 32768,
+    supportedModels: [
+      'gigachat',      // Lite версия
+      'gigachat-pro',  // Pro версия
+      'gigachat-max'   // Max версия
+    ],
+    features: ['streaming', 'function-calling', 'json-mode', 'images']
   };
 }
 ```
 
-##### Yandex GPT Adapter
+##### YandexGPT Adapter
 ```typescript
 class YandexGPTAdapter implements Provider {
   capabilities: {
-    maxTokens: 8192,
-    supportedModels: ['YandexGPT', 'YandexGPT-Lite'],
-    features: ['streaming']
-  };
-}
-```
-
-##### MTS AI Adapter
-```typescript
-class MTSAdapter implements Provider {
-  capabilities: {
-    maxTokens: 4096,
-    supportedModels: ['MTS-LLM', 'MTS-LLM-Pro'],
-    features: ['function-calling']
-  };
-}
-```
-
-##### T-Bank Adapter
-```typescript
-class TBankAdapter implements Provider {
-  capabilities: {
-    maxTokens: 4096,
-    supportedModels: ['GEN-T'],
-    features: ['streaming']
+    supportedModels: [
+      // Lite версии
+      'yandexgpt-lite:latest',
+      'yandexgpt-lite:rc',
+      'yandexgpt-lite:deprecated',
+      // Pro версии
+      'yandexgpt:latest',
+      'yandexgpt:rc',
+      'yandexgpt:deprecated',
+      // 32k версии
+      'yandexgpt-32k:latest',
+      'yandexgpt-32k:rc',
+      'yandexgpt-32k:deprecated'
+    ],
+    maxTokens: {
+      'yandexgpt-lite': 8192,
+      'yandexgpt': 8192,
+      'yandexgpt-32k': 32768
+    },
+    features: ['streaming', 'json-mode']
   };
 }
 ```
@@ -165,24 +163,40 @@ interface CacheService {
   delete(key: string): Promise<void>;
   invalidate(pattern: string): Promise<void>;
 }
+
+interface CacheConfig {
+  defaultTTL: number;
+  rateLimitTTL: number;     // TTL для rate limiting счетчиков (минуты)
+  apiKeyCacheTTL: number;   // TTL для кэша валидации ключей (минуты)
+  monitoringTTL: number;    // TTL для метрик и статусов (минуты)
+}
 ```
 
 #### Key Features
-- Response caching
-- Session management
-- Rate limit tracking
-- Token caching
-- Provider state caching
+
+1. Rate Limiting:
+   - Подсчет запросов по времени
+   - Ограничение нагрузки по ключам
+   - Защита от DDoS
+   - Квоты на использование
+
+2. Кэширование API ключей:
+   - Быстрая валидация через кэш
+   - Снижение нагрузки на БД
+
+3. Мониторинг провайдеров:
+   - Статус доступности в реальном времени
+   - Метрики производительности
+   - История ошибок
+   - Временные проблемы с доступом
 
 #### Implementation
 ```typescript
 class RedisCacheService implements CacheService {
-  constructor(private redis: Redis) {}
-  
-  async get(key: string): Promise<CachedData | null> {
-    const data = await this.redis.get(key);
-    return data ? JSON.parse(data) : null;
-  }
+  constructor(
+    private redis: Redis,
+    private config: CacheConfig
+  ) {}
   
   async set(key: string, value: any, ttl?: number): Promise<void> {
     const serialized = JSON.stringify(value);
@@ -204,12 +218,20 @@ interface MonitoringService {
   recordError(error: Error): Promise<void>;
   checkHealth(service: string): Promise<HealthStatus>;
   getMetrics(query: MetricQuery): Promise<MetricData[]>;
+  getProviderStatus(provider: string): Promise<ProviderStatus>;
 }
 
-interface AlertingService {
-  createAlert(alert: Alert): Promise<void>;
-  resolveAlert(alertId: string): Promise<void>;
-  getActiveAlerts(): Promise<Alert[]>;
+interface ProviderStatus {
+  status: "operational" | "degraded" | "down";
+  latency: number;
+  success_rate: number;
+  last_updated: string;
+  models: {
+    [modelId: string]: {
+      status: string;
+      last_updated: string;
+    };
+  };
 }
 ```
 
@@ -217,8 +239,8 @@ interface AlertingService {
 - Performance metrics collection
 - Error tracking and reporting
 - Health checking
-- Alert management
-- Dashboard generation
+- Provider status monitoring
+- Model status tracking
 
 #### Metrics Collected
 - Request latency
@@ -262,7 +284,7 @@ CREATE TABLE usage (
   id UUID PRIMARY KEY,
   user_id UUID REFERENCES users(id),
   provider VARCHAR(50) NOT NULL,
-  model VARCHAR(50) NOT NULL,
+  model VARCHAR(100) NOT NULL,  -- Включая версию, например "yandexgpt-lite:latest"
   tokens_input INTEGER NOT NULL,
   tokens_output INTEGER NOT NULL,
   cost DECIMAL(10,6) NOT NULL,
@@ -276,6 +298,7 @@ CREATE TABLE usage (
 CREATE TABLE provider_status (
   id UUID PRIMARY KEY,
   provider VARCHAR(50) NOT NULL,
+  model VARCHAR(100) NOT NULL,  -- Включая версию
   status VARCHAR(20) NOT NULL,
   latency INTEGER,
   error_rate DECIMAL(5,2),
