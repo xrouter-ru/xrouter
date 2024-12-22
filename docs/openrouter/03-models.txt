@@ -1,0 +1,93 @@
+Models
+OpenRouter strives to provide access to every potentially useful text-based AI model. In practice there are constraints on where models are reliably hosted, and on our ability to be aware of every new, useful model. If there are models you are interested in that OpenRouter doesn't have, please tell us about in our Discord channel.
+
+Explore and browse 290 models via the website, or via our API:
+
+OpenRouter Models API
+ 1.0.0 
+OAS 3.1
+This API lets you query models supported by OpenRouter.
+
+
+Authorize
+default
+
+
+GET
+/api/v1/models
+
+Parameters
+Try it out
+Name	Description
+supported_parameters
+string
+(query)
+temperature,top_p,tools
+Responses
+Code	Description	Links
+200	
+200 OK
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+{
+  "data": [
+    {
+      "id": "string",
+      "name": "string",
+      "created": 0,
+      "description": "string",
+      "pricing": {
+        "prompt": "string",
+        "completion": "string",
+        "request": "string",
+        "image": "string"
+      },
+      "context_length": 0,
+      "architecture": {
+        "tokenizer": "Router",
+        "instruct_type": "none",
+        "modality": "text->text"
+      },
+      "top_provider": {
+        "context_length": 0,
+        "max_completion_tokens": 0,
+        "is_moderated": true
+      },
+      "per_request_limits": {
+        "prompt_tokens": null,
+        "completion_tokens": null
+      }
+    }
+  ]
+}
+No links
+400	
+400 Bad Request
+
+Media type
+
+application/json
+Example Value
+Schema
+{
+  "error": {
+    "code": 0,
+    "message": "string"
+  }
+}
+No links
+Note: Different models tokenize text in different ways. Some models break up text into chunks of multiple characters (GPT, Claude, Llama, etc) while others tokenize by character (PaLM). This means that token counts (and therefore costs) will vary between models, even when inputs and outputs are the same. Costs are displayed and billed according to the tokenizer for the model in use.
+
+Available authorizations
+
+apiKey  (http, Bearer)
+An API token created in the keys page.
+
+Value:
+Authorize
+Close

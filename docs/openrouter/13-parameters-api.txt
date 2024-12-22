@@ -1,0 +1,94 @@
+Parameters API
+You can use the Parameter API to get the list of supported parameters and a sample value for a model.
+
+OpenRouter Parameters API
+ 1.0.0 
+OAS 3.1
+This API lets you query the top LLM sampling parameter configurations used by users on OpenRouter.
+
+
+Authorize
+default
+
+
+GET
+/api/v1/parameters/{modelId}
+
+
+Parameters
+Try it out
+Name	Description
+modelId *
+string
+(path)
+Specify a model ID, since optimal parameters vary between models. To see a list of available models, click here.
+
+mistralai/mixtral-8x7b-instruct
+provider
+string
+(query)
+Specify a provider name to filter supported parameters for a given model by provider.
+
+Available values : OpenAI, Anthropic, Google, Google AI Studio, Amazon Bedrock, Groq, SambaNova, SambaNova 2, Cohere, Mistral, Together, Together 2, Fireworks, DeepInfra, Lepton, Novita, Avian, Lambda, Azure, Modal, AnyScale, Replicate, Perplexity, Recursal, OctoAI, DeepSeek, Infermatic, AI21, Featherless, Inflection, xAI, Cloudflare, SF Compute, 01.AI, HuggingFace, Mancer, Mancer 2, Hyperbolic, Hyperbolic 2, Lynn 2, Lynn, Reflection
+
+
+OpenAI
+Responses
+Code	Description	Links
+200	
+200 OK
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+{
+  "data": {
+    "model": "string",
+    "supported_parameters": [
+      "temperature"
+    ],
+    "frequency_penalty_p10": 0,
+    "frequency_penalty_p50": 0,
+    "frequency_penalty_p90": 0,
+    "min_p_p10": 0,
+    "min_p_p50": 0,
+    "min_p_p90": 0,
+    "presence_penalty_p10": 0,
+    "presence_penalty_p50": 0,
+    "presence_penalty_p90": 0,
+    "repetition_penalty_p10": 0,
+    "repetition_penalty_p50": 0,
+    "repetition_penalty_p90": 0,
+    "temperature_p10": 0,
+    "temperature_p50": 0,
+    "temperature_p90": 0,
+    "top_a_p10": 0,
+    "top_a_p50": 0,
+    "top_a_p90": 0,
+    "top_k_p10": 0,
+    "top_k_p50": 0,
+    "top_k_p90": 0,
+    "top_p_p10": 0,
+    "top_p_p50": 0,
+    "top_p_p90": 0
+  }
+}
+No links
+404	
+404 Not Found
+
+Media type
+
+application/json
+Example Value
+Schema
+{
+  "error": {
+    "code": 0,
+    "message": "string"
+  }
+}
+No links
