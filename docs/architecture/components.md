@@ -166,18 +166,38 @@ interface CacheService {
 
 interface CacheConfig {
   defaultTTL: number;
-  modelTTL: {
-    [modelId: string]: number;  // Разные TTL для разных моделей
-  };
+  sessionTTL: number;
+  rateLimitTTL: number;
+  tokenTTL: number;
+  monitoringTTL: number;
 }
 ```
 
 #### Key Features
-- Response caching
-- Session management
-- Rate limit tracking
-- Token caching
-- Provider state caching
+
+1. Управление сессиями:
+   - Хранение состояния диалогов
+   - Управление контекстом чата
+   - Поддержка streaming соединений
+   - Временное хранение промежуточных результатов
+
+3. Rate Limiting:
+   - Подсчет запросов по времени
+   - Ограничение нагрузки по ключам
+   - Защита от DDoS
+   - Квоты на использование
+
+4. Кэширование токенов:
+   - Быстрая валидация API ключей
+   - Хранение OAuth токенов
+   - Управление сессиями пользователей
+   - Временные ключи доступа
+
+5. Мониторинг провайдеров:
+   - Статус доступности в реальном времени
+   - Метрики производительности
+   - История ошибок
+   - Временные проблемы с доступом
 
 #### Implementation
 ```typescript
