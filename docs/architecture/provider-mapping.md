@@ -15,10 +15,6 @@
 | repetition_penalty | repetition_penalty | Поддерживается напрямую |
 | prompt | messages | Конвертируется в одно сообщение с role: "user" |
 | messages | messages | Поддерживается напрямую |
-| top_k | - | Игнорируется |
-| min_p | - | Игнорируется |
-| top_a | - | Игнорируется |
-| logit_bias | - | Игнорируется |
 | tools | functions | Маппится на functions GigaChat |
 | tool_choice | function_call | Маппится на function_call GigaChat |
 
@@ -32,11 +28,6 @@
 | repetition_penalty | repetition_penalty | Поддерживается напрямую |
 | prompt | messages | Конвертируется в одно сообщение с role: "user" |
 | messages | messages | Маппинг content -> text |
-| top_p | - | Игнорируется |
-| top_k | - | Игнорируется |
-| min_p | - | Игнорируется |
-| top_a | - | Игнорируется |
-| logit_bias | - | Игнорируется |
 | tools | - | Эмулируется через промпты |
 | tool_choice | - | Эмулируется через промпты |
 
@@ -238,3 +229,17 @@ XRouter унифицирует коды ошибок от провайдеров
 4. Для streaming используйте стандартный формат SSE
 5. Используйте messages вместо prompt для лучшего контроля над контекстом диалога
 6. В одном запросе используйте только один из параметров: prompt или messages
+
+## Поддержка параметров по провайдерам
+
+| Параметр | GigaChat | YandexGPT | Примечания |
+|----------|----------|-----------|------------|
+| temperature | ✅ | ✅ | |
+| max_tokens | ✅ | ✅ | |
+| stream | ✅ | ✅ | |
+| top_p | ✅ | ❌ | |
+| repetition_penalty | ✅ | ✅ | |
+| prompt | ✅* | ✅* | *Конвертируется в messages |
+| messages | ✅ | ✅ | |
+| tools | ✅ | ✅* | *Эмулируется через промпты |
+| tool_choice | ✅ | ✅* | *Эмулируется через промпты |
