@@ -13,6 +13,8 @@
 | stream | stream | Поддерживается напрямую |
 | top_p | top_p | Поддерживается напрямую |
 | repetition_penalty | repetition_penalty | Поддерживается напрямую |
+| prompt | messages | Конвертируется в одно сообщение с role: "user" |
+| messages | messages | Поддерживается напрямую |
 | top_k | - | Игнорируется |
 | min_p | - | Игнорируется |
 | top_a | - | Игнорируется |
@@ -28,6 +30,8 @@
 | max_tokens | maxTokens | Поддерживается напрямую |
 | stream | stream | Поддерживается напрямую |
 | repetition_penalty | repetition_penalty | Поддерживается напрямую |
+| prompt | messages | Конвертируется в одно сообщение с role: "user" |
+| messages | messages | Маппинг content -> text |
 | top_p | - | Игнорируется |
 | top_k | - | Игнорируется |
 | min_p | - | Игнорируется |
@@ -35,6 +39,97 @@
 | logit_bias | - | Игнорируется |
 | tools | - | Эмулируется через промпты |
 | tool_choice | - | Эмулируется через промпты |
+
+## Маппинг prompt и messages
+
+XRouter поддерживает два взаимоисключающих способа отправки запроса:
+
+1. Через параметр prompt (простой текстовый запрос):
+```typescript
+{
+  "prompt": "Привет, как дела?",
+  "temperature": 0.7
+}
+```
+
+2. Через параметр messages (полный контроль над контекстом):
+```typescript
+{
+  "messages": [
+    {"role": "system", "content": "Ты дружелюбный ассистент"},
+    {"role": "user", "content": "Привет, как дела?"}
+  ],
+  "temperature": 0.7
+}
+```
+
+В запросе должен быть указан ТОЛЬКО ОДИН из этих параметров. Если указаны оба, возвращается ошибка 400 Bad Request.
+
+### Маппинг для GigaChat
+
+```typescript
+// Запрос с prompt
+{
+  "prompt": "Привет, как дела?",
+  "temperature": 0.7
+}
+
+// Преобразуется в:
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Привет, как дела?"
+    }
+  ],
+  "temperature": 0.7
+}
+
+// Запрос с messages передается как есть
+{
+  "messages": [...],
+  "temperature": 0.7
+}
+```
+
+### Маппинг для YandexGPT
+
+```typescript
+// Запрос с prompt
+{
+  "prompt": "Привет, как дела?",
+  "temperature": 0.7
+}
+
+// Преобразуется в:
+{
+  "messages": [
+    {
+      "role": "user", 
+      "text": "Привет, как дела?"
+    }
+  ],
+  "completionOptions": {
+    "temperature": 0.7
+  }
+}
+
+// Запрос с messages
+{
+  "messages": [
+    {"role": "system", "content": "Ты дружелюбный ассистент"},
+    {"role": "user", "content": "Привет!"}
+  ]
+}
+
+// Преобразуется в:
+{
+  "messages": [
+    {"role": "system", "text": "Ты дружелюбный ассистент"},
+    {"role": "user", "text": "Привет!"}
+  ]
+}
+```
 
 ## Function Calling
 
@@ -141,3 +236,5 @@ XRouter унифицирует коды ошибок от провайдеров
 2. Для function calling предпочтительно использовать GigaChat
 3. При необходимости использовать расширенные параметры, проверяйте их поддержку через endpoint /parameters/{modelId}
 4. Для streaming используйте стандартный формат SSE
+5. Используйте messages вместо prompt для лучшего контроля над контекстом диалога
+6. В одном запросе используйте только один из параметров: prompt или messages
