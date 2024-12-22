@@ -1,0 +1,22 @@
+ntegrations
+Bring your own provider API Keys
+OpenRouter supports both OpenRouter credits and the option to bring your own provider keys (BYOK).
+
+When you use OpenRouter credits, your rate limits for each provider are managed by OpenRouter.
+
+Using provider keys enables direct control over rate limits and costs via your provider account.
+
+Your provider keys are securely encrypted and used for all requests routed through the specified provider.
+
+Manage keys in your account settings.
+
+The cost of using custom provider keys on OpenRouter is 5% of the upstream provider's cost.
+
+Automatic Fallback
+You can configure individual keys to act as fallbacks.
+
+When "Use this key as a fallback" is enabled for a key, OpenRouter will prioritize using your credits. If it hits a rate limit or encounters a failure, it will then retry with your key.
+
+Conversely, if "Use this key as a fallback" is disabled for a key, OpenRouter will prioritize using your key. If it hits a rate limit or encounters a failure, it will then retry with your credits.
+Embeddings
+OpenRouter does not currently provide an embeddings API.
