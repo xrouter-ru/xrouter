@@ -1,0 +1,1389 @@
+Сгенерируйте текст
+Примечание
+
+Чтобы повышать качество генерируемых ответов, YandexGPT API логирует промты пользователей. Не передавайте в запросах чувствительную информацию и персональные данные.
+
+
+
+
+
+
+
+
+
+
+Создайте файл с телом запроса (например, prompt.json):
+
+{
+  "modelUri": "gpt://<идентификатор_каталога>/yandexgpt-lite",
+  "completionOptions": {
+    "stream": false,
+    "temperature": 0.6,
+    "maxTokens": "2000"
+  },
+  "messages": [
+    {
+      "role": "system",
+      "text": "Найди ошибки в тексте и исправь их"
+    },
+    {
+      "role": "user",
+      "text": "Ламинат подойдет для укладке на кухне или в детской комнате – он не боиться влаги и механических повреждений благодаря защитному слою из облицованных меламиновых пленок толщиной 0,2 мм и обработанным воском замкам."
+    }
+  ]
+}
+
+Где:
+
+modelUri — идентификатор модели, которая будет использоваться для генерации ответа. Параметр содержит идентификатор каталога Yandex Cloud или идентификатор дообученной в DataSphere модели.
+
+completionOptions — параметры конфигурации запроса:
+
+stream — включает потоковую передачу частично сгенерированного текста. Принимает значения true или false.
+temperature — чем выше значение этого параметра, тем более креативными и случайными будут ответы модели. Принимает значения от 0 (включительно) до 1 (включительно). Значение по умолчанию: 0.3.
+maxTokens — устанавливает ограничение на выход модели в токенах. Максимальное число токенов генерации зависит от модели. Подробнее см. в разделе Квоты и лимиты в Yandex Foundation Models.
+messages — список сообщений, которые задают контекст для модели:
+
+role — роль отправителя сообщения:
+
+user — предназначена для отправки пользовательских сообщений к модели.
+system — позволяет задать контекст запроса и определить поведение модели.
+assistant — используется для ответов, которые генерирует модель. При работе в режиме чата ответы модели, помеченные ролью assistant, включаются в состав сообщения для сохранения контекста беседы. Не передавайте сообщения пользователя с этой ролью.
+text — текстовое содержимое сообщения.
+
+Отправьте запрос нейросети с помощью метода completion, выполнив команду:
+
+export FOLDER_ID=<идентификатор_каталога>
+export IAM_TOKEN=<IAM-токен>
+curl \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer ${IAM_TOKEN}" \
+  --data "@prompt.json" \
+  "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+
+Где:
+
+FOLDER_ID— идентификатор каталога, на который у вашего аккаунта есть роль ai.languageModels.user или выше.
+IAM_TOKEN — IAM-токен, полученный перед началом работы.
+В ответе сервис вернет сгенерированный текст:
+
+{
+  "result": {
+    "alternatives": [
+      {
+        "message": {
+          "role": "assistant",
+          "text": "Ламинат подходит для укладки на кухне и в детской комнате. Он не боится влажности и механических повреждений, благодаря защитному слою, состоящему из меланиновых плёнок толщиной 0.2 мм, и обработанным воском замкам."
+        },
+        "status": "ALTERNATIVE_STATUS_TRUNCATED_FINAL"
+      }
+    ],
+    "usage": {
+      "inputTextTokens": "67",
+      "completionTokens": "50",
+      "totalTokens": "117"
+    },
+    "modelVersion": "06.12.2023"
+  }
+}
+
+Отправить запрос в промт-режиме
+Статья создана
+
+Yandex Cloud
+Обновлена 30 сентября 2024 г.
+Чтобы сгенерировать текст в промт-режиме, отправьте запрос к модели с помощью метода completion.
+
+Перед началом работы
+Получите данные для аутентификации в API, как описано в разделе Аутентификация в API Yandex Foundation Models.
+
+Запрос к модели через REST API
+
+
+
+
+
+
+
+
+
+
+
+Создайте файл test.py с кодом запроса к модели:
+
+import requests
+import argparse
+
+URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+
+def run(iam_token, folder_id, user_text):    
+    # Собираем запрос
+    data = {}
+    # Указываем тип модели
+    data["modelUri"] = f"gpt://{folder_id}/yandexgpt"
+    # Настраиваем опции
+    data["completionOptions"] = {"temperature": 0.3, "maxTokens": 1000}
+    # Указываем контекст для модели
+    data["messages"] = [
+        {"role": "system", "text": "Исправь ошибки в тексте."},
+        {"role": "user", "text": f"{user_text}"},
+    ]
+    
+    # Отправляем запрос
+    response = requests.post(
+        URL,
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {iam_token}"
+        },
+        json=data,
+    ).json()
+
+    #Распечатываем результат
+    print(response)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--iam_token", required=True, help="IAM token")
+    parser.add_argument("--folder_id", required=True, help="Folder id")
+    parser.add_argument("--user_text", required=True, help="User text")
+    args = parser.parse_args()
+    run(args.iam_token, args.folder_id, args.user_text)
+
+Запустите файл test.py, подставив значение IAM-токена и идентификатор каталога:
+
+export IAM_TOKEN=<IAM-токен>
+export FOLDER_ID=<идентификатор_каталога>
+export TEXT='Ашипки саме сибя ни исрпвят'
+python test.py \
+  --iam_token ${IAM_TOKEN} \
+  --folder_id ${FOLDER_ID} \
+  --user_text ${TEXT}
+
+Запрос к модели через gRPC API
+Пример ниже разработан для выполнения в операционных системах MacOS и Linux. Чтобы выполнить его в системе Windows, ознакомьтесь с особенностями работы с Bash в Microsoft Windows.
+
+Склонируйте репозиторий Yandex Cloud API, вставив код в ячейку ноутбука:
+
+git clone https://github.com/yandex-cloud/cloudapi
+
+Установите пакет grpcio-tools с помощью менеджера пакетов pip:
+
+pip install grpcio-tools
+
+Перейдите в папку со склонированным репозиторием Yandex Cloud API:
+
+cd <путь_к_папке_cloudapi>
+
+Создайте папку output:
+
+mkdir output
+
+Сгенерируйте код интерфейса клиента:
+
+python -m grpc_tools.protoc -I . -I third_party/googleapis \
+  --python_out=output \
+  --grpc_python_out=output \
+    google/api/http.proto \
+    google/api/annotations.proto \
+    yandex/cloud/api/operation.proto \
+    google/rpc/status.proto \
+    yandex/cloud/operation/operation.proto \
+    yandex/cloud/validation.proto \
+    yandex/cloud/ai/foundation_models/v1/text_generation/text_generation_service.proto \
+    yandex/cloud/ai/foundation_models/v1/text_common.proto
+
+В папке output создайте файл test.py с кодом запроса к модели:
+
+# coding=utf8
+import argparse
+import grpc
+
+import yandex.cloud.ai.foundation_models.v1.text_common_pb2 as pb
+import yandex.cloud.ai.foundation_models.v1.text_generation.text_generation_service_pb2_grpc as service_pb_grpc
+import yandex.cloud.ai.foundation_models.v1.text_generation.text_generation_service_pb2 as service_pb
+
+def run(iam_token, folder_id, user_text):
+    cred = grpc.ssl_channel_credentials()
+    channel = grpc.secure_channel('llm.api.cloud.yandex.net:443', cred)
+    stub = service_pb_grpc.TextGenerationServiceStub(channel)
+
+    request = service_pb.CompletionRequest(
+        model_uri=f"gpt://{folder_id}/yandexgpt",
+        completion_options=pb.CompletionOptions(
+            max_tokens={"value": 2000}, 
+            temperature={"value": 0.5}
+        ),
+    )
+    message_system = request.messages.add()
+    message_system.role = "system"
+    message_system.text = "Исправь ошибки в тексте."
+
+    message_user = request.messages.add()
+    message_user.role = "user"
+    message_user.text = user_text
+
+    it = stub.Completion(request, metadata=(
+        ('authorization', f'Bearer {iam_token}'),
+    ))
+    for response in it:
+        for alternative in response.alternatives:
+            print (alternative.message.text)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--iam_token", required=True, help="IAM token")
+    parser.add_argument("--folder_id", required=True, help="Folder id")
+    parser.add_argument("--user_text", required=True, help="User text")
+    args = parser.parse_args()
+    run(args.iam_token, args.folder_id, args.user_text)
+
+Запустите файл test.py, подставив значение IAM-токена и идентификатор каталога:
+
+export IAM_TOKEN=<IAM-токен>
+export FOLDER_ID=<идентификатор_каталога>
+export TEXT='Ашипки саме сибя ни исрпвят'
+python output/test.py \
+  --iam_token ${IAM_TOKEN} \
+  --folder_id ${FOLDER_ID} \
+  --user_text ${TEXT}
+
+Потоковый запрос через gRPC API
+При включенном параметре stream сервер будет присылать не только финальный результат генерации текста, но и промежуточные результаты. Каждый промежуточный ответ содержит весь результат генерации, доступный на текущий момент. До получения финального ответа результаты генерации могут меняться с приходом новых сообщений.
+
+Работа параметра stream максимально наглядна при создании и обработке больших текстов.
+
+Важно
+
+Параметр stream недоступен для асинхронного режима работы модели.
+
+Сгенерируйте код интерфейса клиента gRPC, как описано в инструкции. На шаге 6 создайте файл test.py, содержащий код обращения к модели:
+
+# coding=utf8
+import argparse
+import grpc
+
+import yandex.cloud.ai.foundation_models.v1.text_common_pb2 as pb
+import yandex.cloud.ai.foundation_models.v1.text_generation.text_generation_service_pb2_grpc as service_pb_grpc
+import yandex.cloud.ai.foundation_models.v1.text_generation.text_generation_service_pb2 as service_pb
+
+def run(iam_token, folder_id, user_text):
+    cred = grpc.ssl_channel_credentials()
+    channel = grpc.secure_channel('llm.api.cloud.yandex.net:443', cred)
+    stub = service_pb_grpc.TextGenerationServiceStub(channel)
+
+    request = service_pb.CompletionRequest(
+            model_uri=f"gpt://{folder_id}/yandexgpt",
+            completion_options=pb.CompletionOptions(
+                max_tokens={"value": 2000},
+                temperature={"value": 0.5},
+                stream=True
+            ),
+        )
+        message_system = request.messages.add()
+        message_system.role = "system"
+        message_system.text = "Исправь ошибки в тексте."
+    
+        message_user = request.messages.add()
+        message_user.role = "user"
+        message_user.text = user_text
+    
+        it = stub.Completion(request, metadata=(
+            ('authorization', f'Bearer {iam_token}'),
+        ))             
+        
+        for response in it:
+            print(response)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--iam_token", required=True, help="IAM token")
+    parser.add_argument("--folder_id", required=True, help="Folder id")
+    parser.add_argument("--user_text", required=True, help="User text")
+    args = parser.parse_args()
+    run(args.iam_token, args.folder_id, args.user_text)
+
+Как реализовать чат с YandexGPT
+Статья создана
+
+Yandex Cloud
+Обновлена 20 ноября 2024 г.
+Модели YandexGPT API не хранят контекст предшествующих сообщений, поэтому для реализации диалога с моделью историю сообщений нужно сохранять на стороне клиента и передавать в каждом обращении к модели. Чат, доступный в Foundation Models Playground, представляет собой серию промт-запросов, в которой в контекст каждого нового запроса добавляются ответы модели на предыдущие запросы. Модели YandexGPT API могут работать с контекстом до 8192 токенов.
+
+Совет
+
+Используйте AI Assistant API, чтобы создать чат с моделью. Пример реализации чата с помощью ассистентов и тредов доступен в инструкции Создать простого ассистента.
+
+Чтобы реализовать в своем приложении чат с моделью и избежать задержек с ответами, отправляйте промт-запросы в синхронном режиме с помощью метода completion.
+
+Чтобы реализовать чат:
+
+Получите данные для аутентификации в API, как описано в разделе Аутентификация в API Yandex Foundation Models.
+
+Подготовьте файл запроса к модели, например body.json:
+
+{
+  "modelUri": "gpt://<идентификатор_каталога>/yandexgpt-lite",
+  "completionOptions": {
+    "stream": false,
+    "temperature": 0.6,
+    "maxTokens": "2000"
+  },
+  "messages": [
+    {
+      "role": "system",
+      "text": "Ты умный ассистент"
+    },
+    {
+      "role": "user", 
+      "text": "Привет! Какими науками занимался Альберт Эйнштейн?"
+    }
+  ]
+}
+
+Где:
+
+modelUri — идентификатор модели, которая будет использоваться для генерации ответа. Параметр содержит идентификатор каталога Yandex Cloud или идентификатор дообученной в DataSphere модели.
+
+completionOptions — параметры конфигурации запроса:
+
+stream — включает потоковую передачу частично сгенерированного текста. Принимает значения true или false.
+temperature — чем выше значение этого параметра, тем более креативными и случайными будут ответы модели. Принимает значения от 0 (включительно) до 1 (включительно). Значение по умолчанию: 0.3.
+maxTokens — устанавливает ограничение на выход модели в токенах. Максимальное число токенов генерации зависит от модели. Подробнее см. в разделе Квоты и лимиты в Yandex Foundation Models.
+messages — список сообщений, которые задают контекст для модели:
+
+role — роль отправителя сообщения:
+
+user — предназначена для отправки пользовательских сообщений к модели.
+system — позволяет задать контекст запроса и определить поведение модели.
+assistant — используется для ответов, которые генерирует модель. При работе в режиме чата ответы модели, помеченные ролью assistant, включаются в состав сообщения для сохранения контекста беседы. Не передавайте сообщения пользователя с этой ролью.
+text — текстовое содержимое сообщения.
+
+Отправьте запрос к модели:
+
+Выполните команду:
+
+export FOLDER_ID=<идентификатор_каталога>
+export IAM_TOKEN=<IAM-токен>
+curl \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer ${IAM_TOKEN}" \
+  --header "x-folder-id: ${FOLDER_ID}" \
+  --data "@<путь_до_файла_json>" \
+  "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
+
+Где:
+
+FOLDER_ID — идентификатор каталога, на который у вашего аккаунта есть роль ai.languageModels.user или выше.
+IAM_TOKEN — IAM-токен вашего аккаунта.
+
+
+
+
+
+В ответ на запрос модель вернет сгенерированный текст:
+
+Сохраните значение записи message для использования в последующем запросе.
+
+В конец массива messages в файл запроса добавьте значение записи message, полученное в результате выполнения предыдущего запроса к модели, а также новый вопрос пользователя:
+
+{
+  "modelUri": "gpt://<идентификатор_каталога>/yandexgpt-lite",
+  "completionOptions": {
+    "stream": false,
+    "temperature": 0.6,
+    "maxTokens": "2000"
+  },
+  "messages": [
+    {
+      "role": "system",
+      "text": "Ты умный ассистент"
+    },
+    {
+      "role": "user", 
+      "text": "Привет! Какими науками занимался Альберт Эйнштейн?"
+    },
+    {
+      "role": "assistant", 
+      "text": "Альберт Эйнштейн был выдающимся физиком, труды которого в области теоретической физики, теоретической механики и философии науки стали фундаментальными. Он посвятил свою карьеру изучению основ Вселенной, включая теорию относительности, специальную и общую теорию относительности. Кроме того, Альберт Эйнштейн изучал:\n\n* термодинамику,\n* статистическую механику,\n* электромагнетизм,\n* квантовую теорию,\n* специальную теорию относительности и др.\n\nЕго работы по общей теории относительности получили широкое признание и оказали глубокое влияние на развитие современной физики."
+    },
+    {
+      "role": "user", 
+      "text": "Какие важные открытия он совершил?"
+    }
+  ]
+}
+
+Отправьте новый запрос к модели, повторив третий шаг инструкции. В ответ на запрос модель снова вернет сгенерированный текст:
+
+Снова сохраните значение записи message для использования в последующем запросе.
+
+Продолжайте дополнять контекст запроса полученными ответами и вопросами пользователя:
+
+{
+  "modelUri": "gpt://<идентификатор_каталога>/yandexgpt-lite",
+  "completionOptions": {
+    "stream": false,
+    "temperature": 0.6,
+    "maxTokens": "2000"
+  },
+  "messages": [
+    {
+      "role": "system",
+      "text": "Ты умный ассистент"
+    },
+    {
+      "role": "user", 
+      "text": "Привет! Какими науками занимался Альберт Эйнштейн?"
+    },
+    {
+      "role": "assistant", 
+      "text": "Альберт Эйнштейн был выдающимся физиком, труды которого в области теоретической физики, теоретической механики и философии науки стали фундаментальными. Он посвятил свою карьеру изучению основ Вселенной, включая теорию относительности, специальную и общую теорию относительности. Кроме того, Альберт Эйнштейн изучал:\n\n* термодинамику,\n* статистическую механику,\n* электромагнетизм,\n* квантовую теорию,\n* специальную теорию относительности и др.\n\nЕго работы по общей теории относительности получили широкое признание и оказали глубокое влияние на развитие современной физики."
+    },
+    {
+      "role": "user", 
+      "text": "Какие важные открытия он совершил?"
+    },
+    {
+      "role": "assistant",
+      "text": "Вот некоторые открытия, которые обычно связывают с именем Альберта Эйнштейна:\n1. **Специальная теория относительности (СТО)** — теория, описывающая движение, законы механики и пространственно-временные отношения при произвольных скоростях, меньших скорости света в вакууме.\n1. **Общая теория относительности (ОТО)** — геометрическая теория тяготения, основанная на предсказании взаимосвязи между координатами пространства-времени, материи и энергии.\n1. **Квантовая теория фотоэффекта** — объяснение фотоэффекта, явления выбивания электронов из вещества под действием электромагнитного излучения.\n1. **Броуновское движение** — явление беспорядочного, случайного движения микроскопических частиц, взвешенных в жидкости или газе, происходящее из-за теплового движения молекул окружающей среды.\n1. **Эквивалентность гравитационной и инерционной массы** — идея о том, что гравитационная и инертная масса являются разными аспектами одной и той же величины.\n1. **Космологические решения уравнений ОТО** — вклад в теорию строения и динамики Вселенной.\n1. **Ядерная модель атома** — описание структуры атома на основе протонов, нейтронов и электронов.\nЭто лишь некоторые из открытий Альберта Эйнштейна. Его вклад в науку и философию огромен, и его исследования продолжают оказывать влияние на наши представления о природе и Вселенной."
+    },
+    {
+      "role": "user",
+      "text": "Сократи свой ответ"
+    }
+  ]
+}
+
+Отправить асинхронный запрос
+Статья создана
+
+Yandex Cloud
+Обновлена 30 сентября 2024 г.
+Запросы к моделям YandexGPT API можно отправлять в асинхронном режиме. В ответ на асинхронный запрос модель вернет объект Operation, содержащий идентификатор операции, по которому можно отследить ее выполнение и получить результат после того, как генерация завершится. Этот режим подходит, если ваши задачи не требуют срочного ответа, поскольку асинхронные запросы выполняются дольше, чем синхронные.
+
+Перед началом работы
+Получите данные для аутентификации в API, как описано в разделе Аутентификация в API Yandex Foundation Models.
+
+Отправьте запрос к модели
+Чтобы воспользоваться примерами, установите cURL.
+
+Пример ниже разработан для выполнения в операционных системах MacOS и Linux. Чтобы выполнить его в системе Windows, ознакомьтесь с особенностями работы с Bash в Microsoft Windows.
+
+Создайте файл с телом запроса (например, body.json):
+
+{
+  "modelUri": "gpt://<идентификатор_каталога>/yandexgpt-lite",
+  "completionOptions": {
+    "stream": false,
+    "temperature": 0.1,
+    "maxTokens": "2000"
+  },
+  "messages": [
+    {
+      "role": "system",
+      "text": "Переведи текст"
+    },
+    {
+      "role": "user",
+      "text": "To be, or not to be: that is the question."
+    }
+  ]
+}
+
+modelUri — идентификатор модели, которая будет использоваться для генерации ответа. Параметр содержит идентификатор каталога Yandex Cloud или идентификатор дообученной в DataSphere модели.
+
+completionOptions — параметры конфигурации запроса:
+
+stream — включает потоковую передачу частично сгенерированного текста. Принимает значения true или false.
+temperature — чем выше значение этого параметра, тем более креативными и случайными будут ответы модели. Принимает значения от 0 (включительно) до 1 (включительно). Значение по умолчанию: 0.3.
+maxTokens — устанавливает ограничение на выход модели в токенах. Максимальное число токенов генерации зависит от модели. Подробнее см. в разделе Квоты и лимиты в Yandex Foundation Models.
+messages — список сообщений, которые задают контекст для модели:
+
+role — роль отправителя сообщения:
+
+user — предназначена для отправки пользовательских сообщений к модели.
+system — позволяет задать контекст запроса и определить поведение модели.
+assistant — используется для ответов, которые генерирует модель. При работе в режиме чата ответы модели, помеченные ролью assistant, включаются в состав сообщения для сохранения контекста беседы. Не передавайте сообщения пользователя с этой ролью.
+text — текстовое содержимое сообщения.
+
+Отправьте запрос к модели, выполнив команду:
+
+export FOLDER_ID=<идентификатор_каталога>
+export IAM_TOKEN=<IAM-токен>
+curl \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --header "Authorization: Bearer ${IAM_TOKEN}" \
+  --header "x-folder-id: ${FOLDER_ID}" \
+  --data "@<путь_до_файла_json>" \
+  "https://llm.api.cloud.yandex.net/foundationModels/v1/completionAsync"
+
+Где:
+
+FOLDER_ID— идентификатор каталога, на который у вашего аккаунта есть роль ai.languageModels.user или выше.
+IAM_TOKEN — IAM-токен, полученный перед началом работы.
+В ответе сервис вернет объект Operation:
+
+{
+  "id": "d7qi6shlbvo5********",
+  "description": "Async GPT Completion",
+  "createdAt": "2023-11-30T18:31:32Z",
+  "createdBy": "aje2stn6id9k********",
+  "modifiedAt": "2023-11-30T18:31:33Z",
+  "done": false,
+  "metadata": null
+}
+
+Сохраните идентификатор (id) операции, полученный в ответе.
+
+Отправьте запрос на получение результата операции:
+
+curl \
+  --request GET \
+  --header "Authorization: Bearer ${IAM_TOKEN}" \
+  https://operation.api.cloud.yandex.net/operations/<ID_операции>
+
+Пример результата:
+
+{
+  "done": true,
+  "response": {
+    "@type": "type.googleapis.com/yandex.cloud.ai.foundation_models.v1.CompletionResponse",
+    "alternatives": [
+      {
+        "message": {
+          "role": "assistant",
+          "text": "Быть или не быть: вот в чём вопрос."
+        },
+        "status": "ALTERNATIVE_STATUS_FINAL"
+      }
+    ],
+    "usage": {
+      "inputTextTokens": "31",
+      "completionTokens": "10",
+      "totalTokens": "41"
+    },
+    "modelVersion": "18.01.2024"
+  },
+  "id": "d7qo21o5fj1u********",
+  "description": "Async GPT Completion",
+  "createdAt": "2024-05-12T18:46:54Z",
+  "createdBy": "ajes08feato8********",
+  "modifiedAt": "2024-05-12T18:46:55Z"
+}
+
+Использовать классификаторы по промту на базе YandexGPT
+Статья создана
+
+Yandex Cloud
+Обновлена 30 сентября 2024 г.
+Сервис Yandex Foundation Models предоставляет классификаторы по промту на базе YandexGPT двух видов: Zero-shot и Few-shot. Чтобы направить запрос к классификатору по промту, используйте метод fewShotClassify Text Classification API.
+
+Перед началом работы
+Получите данные для аутентификации в API, как описано в разделе Аутентификация в API Yandex Foundation Models.
+
+Отправьте запрос к классификатору
+Чтобы отправить запрос к классификатору:
+
+Создайте файл с телом запроса (например, body.json):
+
+{
+  "modelUri": "cls://<идентификатор_каталога>/yandexgpt/latest",
+  "text": "5:0",
+  "task_description": "Определи категорию статьи по ее заголовку",
+  "labels": [
+    "культура",
+    "технологии",
+    "спорт"
+  ]
+}
+
+Где:
+
+modelUri — идентификатор модели, которая будет использоваться для классификации сообщения. Параметр содержит идентификатор каталога Yandex Cloud.
+
+text — текстовое содержимое сообщения.
+
+taskDescription — текстовое описание задания для классификатора.
+
+labels — массив классов.
+
+Задавайте осмысленные названия для классов labels: это обязательное условие получения корректных результатов классификации. Например: вместо классов хм и фз используйте классы химия и физика.
+
+
+
+
+
+
+
+
+Отправьте запрос к классификатору, выполнив команду:
+
+Чтобы воспользоваться примерами, установите cURL.
+
+Пример ниже разработан для выполнения в операционных системах MacOS и Linux. Чтобы выполнить его в системе Windows, ознакомьтесь с особенностями работы с Bash в Microsoft Windows.
+
+export IAM_TOKEN=<IAM-токен>
+curl \
+  --request POST \
+  --header "Authorization: Bearer ${IAM_TOKEN}" \
+  --data "@<путь_к_файлу_с_телом_запроса>" \
+  "https://llm.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification"
+
+Примечание
+
+Эндпоинт https://llm.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification работает только с классификаторами по промту. Для дообученных классификаторов используйте https://llm.api.cloud.yandex.net:443/foundationModels/v1/textClassification.
+
+В ответе сервис вернет результаты классификации с определенными значениями вероятности (confidence) отнесения текста запроса к каждому из классов:
+
+{
+  "predictions": [
+    {
+      "label": "культура",
+      "confidence": 2.2111835562554916e-7
+    },
+    {
+      "label": "технологии",
+      "confidence": 0.0003487042267806828
+    },
+    {
+      "label": "спорт",
+      "confidence": 0.9996510744094849
+    }
+  ],
+  "modelVersion": "07.03.2024"
+}
+
+Сумма значений полей вероятности (confidence) для всех классов всегда равна 1.
+Использовать дообученные классификаторы на базе YandexGPT
+Статья создана
+
+Yandex Cloud
+Обновлена 30 сентября 2024 г.
+Чтобы выполнить запрос к классификатору дообученной в DataSphere модели, используйте метод classify Text Classification API.
+
+Перед началом работы
+Получите данные для аутентификации в API, как описано в разделе Аутентификация в API Yandex Foundation Models.
+
+Отправьте запрос к классификатору
+Чтобы отправить запрос к классификатору:
+
+Чтобы воспользоваться примерами, установите cURL.
+
+Пример ниже разработан для выполнения в операционных системах MacOS и Linux. Чтобы выполнить его в системе Windows, ознакомьтесь с особенностями работы с Bash в Microsoft Windows.
+
+Создайте файл с телом запроса (например, body.json):
+
+{
+  "modelUri": "cls://<идентификатор_каталога>/<идентификатор_классификатора>",
+  "text": "<текст_запроса>"
+}
+
+Где:
+
+modelUri — идентификатор модели, которая будет использоваться для классификации сообщения. Параметр содержит идентификатор каталога Yandex Cloud и идентификатор дообученной в DataSphere модели.
+text — текстовое содержимое сообщения. Суммарное количество токенов на один запрос не должно превышать 8000.
+Имена классов, по которым модель будет распределять запросы, должны быть заданы в процессе дообучения модели, поэтому не передаются в запросе.
+
+Отправьте запрос к классификатору, выполнив команду:
+
+export IAM_TOKEN=<IAM-токен>
+curl \
+  --request POST \
+  --header "Authorization: Bearer ${IAM_TOKEN}" \
+  --data "@<путь_к_файлу_с_телом_запроса>" \
+  "https://llm.api.cloud.yandex.net:443/foundationModels/v1/textClassification"
+
+Примечание
+
+Эндпоинт https://llm.api.cloud.yandex.net:443/foundationModels/v1/textClassification работает только с дообученными классификаторами. Для классификаторов по промту используйте https://llm.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification.
+
+В ответе сервис вернет результаты классификации с определенными значениями вероятности (confidence) принадлежности текста запроса к каждому из классов:
+
+{
+  "predictions": [
+    {
+      "label": "<название_класса_1>",
+      "confidence": 0.00010150671005249023
+    },
+    {
+      "label": "<название_класса_2>",
+      "confidence": 0.000008225440979003906
+    },
+    ...
+    {
+      "label": "<название_класса_n>",
+      "confidence": 0.93212890625
+    }
+  ],
+  "modelVersion": "<версия_модели>"
+}
+
+При многоклассовой классификации сумма значений полей вероятности (confidence) для всех классов всегда равна 1.
+
+При классификации с несколькими метками значение поля вероятности (confidence) для каждого класса рассчитывается независимо (сумма значений не равна 1).
+
+Создать простого ассистента
+Статья создана
+
+Yandex Cloud
+Обновлена 20 ноября 2024 г.
+Этот пример показывает, как создать ассистента, который будет хранить переписку с моделью YandexGPT Pro RC.
+
+Создайте сервисный аккаунт и назначьте ему роли ai.assistants.editor и ai.languageModels.user.
+
+Для сервисного аккаунта получите и сохраните API-ключ.
+
+Установить библиотеку ML SDK можно с помощью менеджера пакетов pip:
+
+pip install yandex-cloud-ml-sdk
+
+Создайте файл simple-assistant.py и добавьте в него код:
+
+#!/usr/bin/env python3
+from __future__ import annotations
+
+from yandex_cloud_ml_sdk import YCloudML
+
+
+def main() -> None:
+    sdk = YCloudML(folder_id="<идентификатор_каталога>", auth="<API-ключ>")
+
+    # Создаем тред, в котором будем хранить переписку
+    # Тред будет храниться в течение 5 дней
+    thread = sdk.threads.create(name="SimpleAssistant", ttl_days=5, expiration_policy="static")
+    print(f"new {thread=}")
+
+    # Определяем модель YandexGPT Pro RC и ее максимальный контекст
+    model = sdk.models.completions(
+        "yandexgpt", 
+        version="rc",
+        max_tokens=500
+    )
+
+    # Создаем ассистента для модели
+    # Ассистент будет удален через 4 дня, если к нему не будут обращаться
+    assistant = sdk.assistants.create(
+        model,
+        ttl_days=4,
+        expiration_policy="since_last_active",
+    )
+
+    # Здесь нужно предусмотреть чтение сообщений пользователей
+    # Пока же мы просто запишем что-нибудь в тред
+    thread.write("Представьте, что это сообщения пользователя")
+    
+    # Можно посмотреть, что хранится в треде
+    for message in thread:
+        print(f"    {message=}")
+        print(f"    {message.text=}\n")
+
+    # Так можно отдать модели все содержимое треда
+    run = assistant.run(thread)
+    print(f"{run=}")
+    
+    # Чтобы получить результат, нужно дождаться окончания запуска   
+    result = run.wait()
+    
+    # Можно посмотреть все поля результата
+    print(f"run {result=}")
+    
+    # В поле text сохраняется удобная для дальнейшей работы строка
+    print(result.text)
+    
+    thread.write("А это новое сообщение пользователя")
+    # Создадим новый запуск, с учетом предыдущих сообщений пользователя и прошлого ответа модели
+    run = assistant.run(thread)
+    result = run.wait()
+    print(result.text)
+    
+    # Удаляем все ненужное
+    thread.delete()
+    assistant.delete()
+
+
+if __name__ == "__main__":
+    main()
+
+Где:
+
+<идентификатор_каталога> — идентификатор каталога, в котором создан сервисный аккаунт.
+<API-ключ> — API-ключ сервисного аккаунта, полученный ранее.
+Выполните созданный файл:
+
+python3 simple-assistant.py
+
+См. также
+Создать ассистента с поисковым индексом
+Примеры работы с ML SDK на GitHub
+
+Создать ассистента с поисковым индексом
+Статья создана
+
+Yandex Cloud
+Обновлена 21 ноября 2024 г.
+Этот пример показывает, как создать ассистента, который для ответов использует информацию из файлов. В примере будет создан индекс для полнотекстового поиска.
+
+Создайте сервисный аккаунт и назначьте ему роли ai.assistants.editor и ai.languageModels.user.
+
+Для сервисного аккаунта получите и сохраните API-ключ.
+
+Установить библиотеку ML SDK можно с помощью менеджера пакетов pip:
+
+pip install yandex-cloud-ml-sdk
+
+Скачайте и распакуйте архив с примерами файлов, которые будут использоваться как дополнительный источник информации. В файлах содержатся рекламные тексты для туров на Бали и в Казахстан, сгенерированные YandexGPT Pro.
+
+Создайте файл search-assistant.py и добавьте в него код:
+
+#!/usr/bin/env python3
+
+from __future__ import annotations
+import pathlib
+from yandex_cloud_ml_sdk import YCloudML
+from yandex_cloud_ml_sdk.search_indexes import StaticIndexChunkingStrategy, TextSearchIndexType
+
+def local_path(path: str) -> pathlib.Path:
+    return pathlib.Path(__file__).parent / path
+
+
+def main() -> None:
+    sdk = YCloudML(folder_id='<идентификатор_каталога>')
+
+    # Загрузим файлы с примерами
+    # Файлы будут храниться 5 дней
+    files = []
+    for path in ['bali.md', 'kazakhstan.md']:
+        file = sdk.files.upload(
+            local_path(path),
+            ttl_days=5,
+            expiration_policy="static",
+        )
+        files.append(file)
+
+    # Создадим индекс для полнотекстового поиска по загруженным файлам
+    # Максимальный размер фрагмента — 700 токенов с перекрытием 300 токенов
+    operation = sdk.search_indexes.create_deferred(
+        files,
+        index_type=TextSearchIndexType(
+            chunking_strategy=StaticIndexChunkingStrategy(
+                max_chunk_size_tokens=700,
+                chunk_overlap_tokens=300,
+            )
+        )
+    )
+
+    # Дождемся создания поискового индекса
+    search_index = operation.wait()
+
+    # Создадим инструмент для работы с поисковым индексом. Или даже с несколькими индексами, если бы их было больше.
+    tool = sdk.tools.search_index(search_index)
+    
+    # Создадим ассистента для модели YandexGPT Pro Latest
+    # Он будет использовать инструмент поискового индекса
+    assistant = sdk.assistants.create('yandexgpt', tools=[tool])
+    thread = sdk.threads.create()
+
+    thread.write("Сколько стоит виза на Бали?")
+    run = assistant.run(thread)
+    result = run.wait()
+    print('Answer:', result.text)
+
+    # Удаляем все ненужное
+    search_index.delete()
+    thread.delete()
+    assistant.delete()
+
+    for file in files:
+        file.delete()
+
+
+if __name__ == '__main__':
+    main()
+
+Где:
+
+<идентификатор_каталога> — идентификатор каталога, в котором создан сервисный аккаунт.
+<API-ключ> — API-ключ сервисного аккаунта, полученный ранее.
+Выполните созданный файл:
+
+python3 search-assistant.py
+
+См. также
+Создать простого ассистента
+Примеры работы с ML SDK на GitHub
+
+Обзор YandexGPT API
+Статья создана
+
+Yandex Cloud
+Обновлена 7 ноября 2024 г.
+YandexGPT API позволяет быстро создавать текстовый контент: генерировать описание товаров, статьи, новости, информационные рассылки, посты для блога и многое другое. Качество ответа нейросети напрямую зависит от точности переданной инструкции: чем точнее вы опишете свой запрос, тем выше вероятность получить ожидаемый результат. Примеры инструкций и запросов собраны в библиотеке промтов YandexGPT API.
+
+Модель в первую очередь предназначена для работы с русскоязычными текстами, но может понимать около 20 языков, в том числе английский и японский. Кроме текстового описания в промтах необходимо указывать специальный параметр температура, который определяет вариативность ответа модели: чем выше значение температуры, тем более непредсказуемым будет результат выполнения запроса.
+
+Для работы с YandexGPT API в Yandex Cloud доступны два интерфейса. Вы можете отправлять запросы в AI Playground или интегрировать модель в свои приложения с помощью API. Для интеграции доступны интерфейсы REST и gRPC. Также вы можете использовать API для работы с моделями в асинхронном режиме. Примеры работы с YandexGPT через API доступны в разделе Пошаговые инструкции для YandexGPT API.
+
+AI Playground подойдет для знакомства и тестирования: в нем вы можете отправлять синхронные запросы к разным моделям YandexGPT API, настраивать параметры и подбирать промты. При общении модель сохраняет контекст разговора, но вы можете создать новый эксперимент, если контекст необходимо сменить. Кроме того, в навигационном меню слева доступны интерфейсы YandexGPT Playground в формате чата и промт-режима. Используйте их, если вам необходимо полностью повторить поведение модели через API и вы не хотите сохранять результаты диалога.
+
+Подробнее о моделях YandexGPT API см. в разделе Модели YandexGPT API.
+
+Форматирование ответов модели
+По умолчанию модель возвращает ответ, отформатированный с помощью разметки Markdown. Используйте текст промта, чтобы получить ответ с дополнительным форматированием (например с эмодзи) или в другом формате (JSON, XML и т.п.)
+
+Пример:
+
+{
+  "modelUri": "gpt://<идентификатор_каталога>/yandexgpt/latest",
+  "completionOptions": {
+    "stream": false,
+    "temperature": 0.6,
+    "maxTokens": "2000"
+  },
+  "messages": [
+    {
+      "role": "system",
+      "text": "Ты — умный ассистент."
+    },
+    {
+      "role": "user",
+      "text": "Назови любые три группы товаров в продовольственном магазине. Для каждой группы приведи три любые подгруппы, входящие в группу. Представь результат в форме объекта JSON, где каждая группа товаров представлена в виде ключа в объекте JSON, а значениями являются массивы из соответствующих подгрупп. Нужны только данные без вводных фраз и объяснений. Не используй разметку Markdown!"
+    }
+  ]
+}
+
+Результат:
+
+{
+  "result": {
+    "alternatives": [
+      {
+        "message": {
+          "role": "assistant",
+          "text": "{\n    \"мясо\": [\"говядина\", \"свинина\", \"баранина\"],\n    \"молочные продукты\": [\"молоко\", \"творог\", \"сметана\"],\n    \"фрукты\": [\"яблоки\", \"бананы\", \"апельсины\"]\n}"
+        },
+        "status": "ALTERNATIVE_STATUS_FINAL"
+      }
+    ],
+    "usage": {
+      "inputTextTokens": "87",
+      "completionTokens": "58",
+      "totalTokens": "145"
+    },
+    "modelVersion": "07.03.2024"
+  }
+}
+
+Модель вернула ответ в формате JSON, где перенос строки заменен на \n, а кавычки экранированы.
+
+Если с помощью промта вам не удается добиться желаемого результата, попробуйте дообучить модель в Yandex DataSphere.
+
+Модели YandexGPT API
+Статья создана
+
+Yandex Cloud
+Обновлена 2 ноября 2024 г.
+YandexGPT API предоставляет доступ к большим текстовым моделям:
+
+стандартной YandexGPT Lite, подходящей для решения задач в режиме реального времени;
+большой YandexGPT Pro, которая дает более точные ответы на сложные запросы.
+Если стандартных моделей вам недостаточно, вы можете дообучить YandexGPT Pro в сервисе Yandex DataSphere, чтобы модель точнее отвечала на ваши запросы.
+
+Чтобы обратиться к модели по API, в параметре modelUri укажите ее URI, содержащий идентификатор каталога. Сегменты /latest, /rc и /deprecated указывают версию модели. По умолчанию используется сегмент /latest.
+
+Модели генерации YandexGPT API
+При обновлении моделей поколения YandexGPT, доступные в разных ветках (сегменты /latest, /rc и /deprecated), могут меняться.
+
+Важно
+
+Ближайшее обновление модели в ветке Latest произойдет 1 декабря 2024 года.
+
+Модель
+
+URI
+
+Поколение YandexGPT
+
+Режимы работы
+
+YandexGPT Lite
+
+gpt://<идентификатор_каталога>/yandexgpt-lite/deprecated
+gpt://<идентификатор_каталога>/yandexgpt-lite/latest
+gpt://<идентификатор_каталога>/yandexgpt-lite/rc
+
+3
+3
+4
+
+Асинхронный, синхронный
+
+YandexGPT Pro
+
+gpt://<идентификатор_каталога>/yandexgpt/deprcecated
+gpt://<идентификатор_каталога>/yandexgpt/latest
+gpt://<идентификатор_каталога>/yandexgpt/rc
+
+3
+3
+4
+
+Асинхронный, синхронный
+
+YandexGPT Pro 32k
+
+gpt://<идентификатор_каталога>/yandexgpt-32k/rc
+
+4
+
+Синхронный1
+
+Модель, дообученная в Yandex DataSphere
+
+ds://<идентификатор_каталога>/<идентификатор_дообученной_модели>
+
+3
+
+Асинхронный, синхронный
+
+Модифицированные модели делят квоты на использование со своими базовыми моделями.
+
+1 Модель YandexGPT Pro 32k обладает расширенным контекстом и создана специально для обработки больших текстов в синхронном режиме. В асинхронном режиме модель YandexGPT Pro поддерживает тот же объем контекста.
+
+Жизненный цикл модели
+Каждая модель имеет набор характеристик жизненного цикла: название модели, ветка и дата публикации. Эти характеристики позволяют однозначно определить версию модели. Обновление моделей происходит по определенным ниже правилам, чтобы вы могли адаптировать свои решения под новую версию, если это будет необходимо.
+
+Существует три ветки модели (от более старой к новой): Deprecated, Latest, Release Candidate (RC). Для каждой из этих веток действует SLA сервиса.
+
+Ветка RC обновляется по мере готовности новой модели и может измениться в любой момент. Когда модель в ветке RC будет готова к общему использованию, в истории изменений и сообществе пользователей в Telegram появится уведомление о предстоящем релизе.
+
+Через месяц после объявления версия RC становится Latest, а Latest переносится в Deprecated. Поддержка версии Deprecated осуществляется в течение следующего месяца, после чего модели в ветках Deprecated и Latest будут идентичны.
+
+Возможности дообучения
+Модель YandexGPT Pro не получится дообучить новой информации, например базе знаний службы поддержки. Однако вы можете обучить модель отдавать ответ в определенном формате или анализировать текст. Так, модель можно обучить:
+
+пересказывать и изменять формулировки текстов;
+генерировать вопросы к тексту и ответы на них;
+форматировать ответы в определенной стилистике или формате;
+классифицировать тексты, обращения и диалоги;
+извлекать сущности из текста.
+Если вы хотите дообучить модель другим возможностям, обратитесь в техническую поддержку, чтобы узнать о нестандартном обучении модели.
+
+Токены
+Статья создана
+
+Yandex Cloud
+Обновлена 15 апреля 2024 г.
+Нейросети работают с текстами, представляя слова и предложения в виде токенов — смысловых отрывков или часто встречающихся последовательностей символов, характерных для естественного языка. Токены позволяют нейросетям находить закономерности и обрабатывать естественный язык.
+
+YandexGPT API использует свой токенизатор для обработки текстов. Вы можете оценить размер текстового поля в токенах с помощью специальных REST-методов Tokenizer. Число токенов в одном и том же тексте может отличаться для каждой модели.
+
+Векторизация текста
+Статья создана
+
+Yandex Cloud
+Обновлена 13 июня 2024 г.
+Компьютеры обрабатывают любую информацию в виде чисел. Чтобы эффективно работать с текстами на естественных языках, модели искусственного интеллекта преобразовывают слова, фразы и предложения в числовые векторы фиксированного размера, которые сохраняют характеристики слов и связи между ними.
+
+Процесс преобразования текста в такие векторы называется векторизацией, а результирующий вектор — эмбеддингом. Эмбеддинги хранят информацию о тексте и позволяют применять математические методы для обработки текстов. Так, с помощью эмбеддингов можно классифицировать информацию, сравнивать и сопоставлять тексты или организовать поиск по собственной базе знаний.
+
+Модели векторного представления текста
+Yandex Foundation Models предоставляет две модели векторизации текста. Обращение к модели по API возможно по ее URI, содержащему идентификатор каталога. Сегмент /latest указывает версию модели и является необязательным.
+
+Назначение	Размерность выходного вектора	Режим работы	URI
+Векторизация больших текстов исходных данных, например статей документации.	256	Синхронный	emb://<идентификатор_каталога>/text-search-doc/latest
+Векторизация коротких текстов: поисковых запросов, обращений и т.п.	256	Синхронный	emb://<идентификатор_каталога>/text-search-query/latest
+Пример использования эмбеддингов
+Примитивный пример показывает, как с помощью эмбеддингов можно найти наиболее близкий ответ на вопрос по базе знаний. В массиве docs_text собраны исходные данные для векторизации (база знаний), query_text содержит поисковый запрос. После получения эмбеддингов можно вычислить расстояние между каждым вектором в базе знаний и вектором запроса и найти наиболее близкий текст.
+
+import requests
+import numpy as np
+from scipy.spatial.distance import cdist
+
+FOLDER_ID = "<идентификатор_каталога>"
+IAM_TOKEN = "<IAM-токен>"
+
+doc_uri = f"emb://{FOLDER_ID}/text-search-doc/latest"
+query_uri = f"emb://{FOLDER_ID}/text-search-query/latest"
+
+embed_url = "https://llm.api.cloud.yandex.net:443/foundationModels/v1/textEmbedding"
+headers = {"Content-Type": "application/json", "Authorization": f"Bearer {IAM_TOKEN}", "x-folder-id": f"{FOLDER_ID}"}
+
+doc_texts = [
+  """Александр Сергеевич Пушкин (26 мая [6 июня] 1799, Москва — 29 января [10 февраля] 1837, Санкт-Петербург) — русский поэт, драматург и прозаик, заложивший основы русского реалистического направления, литературный критик и теоретик литературы, историк, публицист, журналист.""",
+  """Ромашка — род однолетних цветковых растений семейства астровые, или сложноцветные, по современной классификации объединяет около 70 видов невысоких пахучих трав, цветущих с первого года жизни."""
+]
+
+query_text = "когда день рождения Пушкина?"
+
+def get_embedding(text: str, text_type: str = "doc") -> np.array:
+    query_data = {
+        "modelUri": doc_uri if text_type == "doc" else query_uri,
+        "text": text,
+    }
+
+    return np.array(
+        requests.post(embed_url, json=query_data, headers=headers).json()["embedding"]
+    )
+
+
+query_embedding = get_embedding(query_text, text_type="query")
+docs_embedding = [get_embedding(doc_text) for doc_text in doc_texts]
+
+# Вычисляем косинусное расстояние
+dist = cdist(query_embedding[None, :], docs_embedding, metric="cosine")
+
+# Вычисляем косинусное сходство
+sim = 1 - dist
+
+# most similar doc text
+print(doc_texts[np.argmax(sim)])
+
+Где:
+
+<идентификатор_каталога> — идентификатор каталога Yandex Cloud.
+<IAM-токен> — IAM-токен аккаунта для аутентификации в API.
+Результат выполнения:
+
+Александр Сергеевич Пушкин (26 мая [6 июня] 1799, Москва — 29 января [10 февраля] 1837, Санкт-Петербург) — русский поэт, драматург и прозаик, заложивший основы русского реалистического направления, литературный критик и теоретик литературы, историк, публицист, журналист.
+
+
+Классификаторы на базе YandexGPT
+Статья создана
+
+Yandex Cloud
+Обновлена 24 сентября 2024 г.
+Функциональность классификаторов на базе YandexGPT находится на стадии Preview.
+
+Yandex Foundation Models позволяет классифицировать передаваемые в промтах текстовые запросы. Классификация в моделях на базе YandexGPT реализована в Foundation Models Text Classification API.
+
+В Foundation Models доступна классификация трех типов:
+
+Бинарная классификация относит запрос к одному из двух возможных классов. Например, спам или не спам.
+Многоклассовая классификация относит запрос к одному (и только к одному) из более чем двух классов. Например, центральный процессор компьютера может относиться только к одному поколению.
+Классификация с несколькими метками позволяет относить запрос одновременно к нескольким разным классам, которые не являются взаимоисключающими. Например, к одному и тому же посту в социальной сети может относиться одновременно несколько хештегов.
+Модели классификации доступны только в синхронном режиме.
+
+Сервис Foundation Models предоставляет классификаторы на базе YandexGPT двух видов: по промту и дообучаемые.
+
+Классификаторы по промту
+Классификаторы по промту Foundation Models позволяют выполнять бинарную и многоклассовую классификацию, не требуют дообучения модели и управляются промтом. Метод fewShotClassify Text Classification API позволяет использовать два классификатора по промту: Zero-shot и Few-shot. В метод fewShotClassify можно передать от двух до двадцати классов.
+
+Совет
+
+Задавайте осмысленные названия для классов labels: это обязательное условие получения корректных результатов классификации. Например: вместо классов хм и фз используйте классы химия и физика.
+
+Классификатор Zero-shot
+Классификатор Zero-shot позволяет выполнять бинарную и многоклассовую классификацию, передавая в теле запроса только идентификатор модели, описание задания, текст запроса и массив с именами классов.
+
+Формат тела запроса для классификатора Zero-shot:
+
+{
+  "modelUri": "string",
+  "taskDescription": "string",
+  "labels": [
+    "string",
+    "string",
+    ...
+    "string"
+  ],
+  "text": "string"
+}
+
+Где:
+
+modelUri — идентификатор модели, которая будет использоваться для классификации сообщения. Параметр содержит идентификатор каталога Yandex Cloud.
+
+taskDescription — текстовое описание задания для классификатора.
+
+labels — массив классов.
+
+Задавайте осмысленные названия для классов labels: это обязательное условие получения корректных результатов классификации. Например: вместо классов хм и фз используйте классы химия и физика.
+
+text — текстовое содержимое сообщения.
+
+Для запросов к классификаторам Zero-shot используйте эндпоинт https://llm.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification.
+
+Классификатор Few-shot
+Классификатор Few-shot позволяет выполнять бинарную и многоклассовую классификацию, передавая в модель массив с примерами запросов для классов, заданных в поле labels. Примеры запросов передаются в поле samples тела запроса и позволяют улучшить качество результатов, выдаваемых классификатором.
+
+Формат тела запроса для классификатора Few-shot:
+
+{
+  "modelUri": "string",
+  "taskDescription": "string",
+  "labels": [
+    "string",
+    "string",
+    ...
+    "string"
+  ],
+  "text": "string",
+  "samples": [
+    {
+      "text": "string",
+      "label": "string"
+    },
+    {
+      "text": "string",
+      "label": "string"
+    },
+    ...
+    {
+      "text": "string",
+      "label": "string"
+    }
+  ]
+}
+
+Где:
+
+modelUri — идентификатор модели, которая будет использоваться для классификации сообщения. Параметр содержит идентификатор каталога Yandex Cloud.
+
+taskDescription — текстовое описание задания для классификатора.
+
+labels — массив классов.
+
+Задавайте осмысленные названия для классов labels: это обязательное условие получения корректных результатов классификации. Например: вместо классов хм и фз используйте классы химия и физика.
+
+text — текстовое содержимое сообщения.
+
+samples — массив с примерами запросов для классов, заданных в поле labels. Примеры запросов передаются в виде объектов, каждый из которых содержит один образец текстового запроса и класс, к которому такой запрос следует относить.
+
+Для запросов к классификаторам Few-shot используйте эндпоинт https://llm.api.cloud.yandex.net/foundationModels/v1/fewShotTextClassification.
+
+Важно
+
+Вы можете передавать несколько примеров классификации в одном запросе. Все примеры в запросе не должны превышать 6000 токенов.
+
+Дообучаемые классификаторы
+Если качество результатов классификаторов Zero-shot и Few-shot вас не устраивает, дообучите собственный классификатор на базе YandexGPT в Yandex DataSphere. Дообучаемые классификаторы могут быть обучены всем поддерживаемым типам классификации.
+
+Чтобы выполнить запрос к классификатору дообученной в DataSphere модели, используйте метод classify Text Classification API. В этом случае в модель требуется передать только идентификатор модели и текст запроса. Имена классов, по которым модель будет распределять запросы, должны быть заданы в процессе дообучения модели и в запросе не передаются.
+
+Формат тела запроса для классификатора дообученной в DataSphere модели:
+
+{
+  "modelUri": "string",
+  "text": "string"
+}
+
+Где:
+
+modelUri — идентификатор модели, которая будет использоваться для классификации сообщения. Параметр содержит идентификатор каталога Yandex Cloud и идентификатор дообученной в DataSphere модели.
+text — текстовое содержимое сообщения. Суммарное количество токенов на один запрос не должно превышать 8000.
+Для запросов к дообучаемым классификаторам используйте эндпоинт https://llm.api.cloud.yandex.net:443/foundationModels/v1/textClassification.
+
+Имена классов, по которым модель будет распределять запросы, должны быть заданы в процессе дообучения модели и в запросе не передаются.
+
+Формат ответа
+Все типы классификаторов Foundation Models возвращают результат в следующем формате:
+
+{
+  "predictions": [
+    {
+      "label": "string",
+      "confidence": "number",
+    },
+    {
+      "label": "string",
+      "confidence": "number",
+    },
+    ...
+    {
+      "label": "string",
+      "confidence": "number",
+    }
+  ],
+  "modelVersion": "string"
+}
+
+Где:
+
+label — имя класса.
+
+confidence — значение вероятности отнесения текста запроса к данному классу.
+
+При многоклассовой классификации сумма значений полей вероятности (confidence) для всех классов всегда равна 1.
+
+При классификации с несколькими метками значение поля вероятности (confidence) для каждого класса рассчитывается независимо (сумма значений не равна 1).
+
+Модели классификаторов на базе YandexGPT
+Статья создана
+
+Yandex Cloud
+Обновлена 9 октября 2024 г.
+Обращение к модели классификатора на базе YandexGPT по API возможно по ее URI, содержащему идентификатор каталога. Сегмент /latest указывает версию модели и является необязательным. Чтобы обратиться к модели классификатора на базе YandexGPT, используйте метод fewShotClassify Text Classification API.
+
+Если стандартной модели вам недостаточно, вы можете дообучить классификатор на базе YandexGPT в сервисе Yandex DataSphere, чтобы модель точнее классифицировала на ваши запросы. Чтобы обратиться к дообученной в Yandex DataSphere модели классификатора, используйте метод classify Text Classification API.
+
+Модель	URI	Режим работы
+Классификатор по промту	cls://<идентификатор_каталога>/yandexgpt/latest	Синхронный
+Модель классификатора, дообученная в Yandex DataSphere	cls://<идентификатор_каталога>/<идентификатор_дообученной_модели>
+
+AI Assistant API
+Статья создана
+
+Yandex Cloud
+Обновлена 21 ноября 2024 г.
+Функциональность AI Assistant API находится на стадии Preview.
+
+AI Assistant API — это инструмент создания AI-ассистентов. С его помощью можно создать персонализированных помощников, реализовывать сценарий генеративного ответа с учетом информации из внешних источников (RAG, Retrieval Augmented Generation), а также сохранять контекст запросов к модели.
+
+
+Вы можете создать своего AI-ассистента с помощью Yandex Cloud ML SDK или реализуя запросы к API на языке программирования.
+
+Из чего состоят AI-ассистенты
+AI Assistant API предоставляет несколько абстракций для реализации чат-ботов и AI-ассистентов.
+
+Ассистент определяет, к какой модели нужно обратиться, а также какие параметры и инструкции использовать. Это позволяет настроить модель один раз и использовать эти настройки в будущем без необходимости каждый раз передавать их.
+
+Для хранения контекста истории общения используются треды. Каждый тред — это отдельный диалог с пользователем. Запустив ассистента для треда, вы вызовете модель и передадите весь сохраненный в нем контекст. Промежуточные результаты генерации можно получить, прослушивая текущий запуск, а итоговый результат генерации будет добавлен к треду.
+
+Совет
+
+По умолчанию при каждом запуске модель будет обрабатывать содержимое треда заново. Если в треде хранится большой контекст, а вы запускаете ассистента после каждого сообщения от пользователя, стоимость работы ассистента может стать существенной. Чтобы оптимизировать расходы, попробуйте ограничить размер передаваемого контекста с помощью параметра customPromptTruncationOptions при запуске.
+
+Подробнее о стоимости использования ассистентов см. Правила тарификации ассистентов.
+
+Работа с внешними источниками информации
+Чтобы модель использовала внешние источники информации для ответов на запросы, вы можете загрузить файлы с дополнительной информацией с помощью Files API и создать для них поисковый индекс. Загрузить можно до 1 000 файлов, максимальный размер каждого файла — 128 МБ. Один и тот же файл может содержаться в нескольких поисковых индексах сразу. На текущий момент поисковый индекс может содержать до 100 файлов.
+
+Со всеми ограничениями AI Assistant API можно ознакомиться в разделе Квоты и лимиты в Yandex Foundation Models.
+
+Для загрузки поддерживаются следующие MIME-типы:
+
+application/json
+application/msword
+application/pdf
+application/vnd.ms-excel
+application/vnd.ms-excel.sheet.2
+application/vnd.ms-excel.sheet.3
+application/vnd.ms-excel.sheet.4
+application/vnd.ms-excel.workspace.3
+application/vnd.ms-excel.workspace.4
+application/vnd.ms-outlook
+application/vnd.ms-powerpoint
+application/vnd.ms-project
+application/vnd.ms-word2006ml
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+application/vnd.openxmlformats-officedocument.wordprocessingml.document
+application/x-latex
+application/x-ms-owner
+application/xhtml+xml
+text/csv
+text/html
+text/markdown
+text/plain
+text/xml
+application/rtf
+Примечание
+
+Время хранения загруженных файлов и поисковых индексов ограничено. Вы можете настроить его при загрузке файла с помощью параметра ExpirationConfig. По умолчанию файлы будут удалены, если в течение 7 дней они не используются.
+
+При создании поискового индекса вы задаете тип поиска, для которого индекс будет использоваться. Поддерживаются полнотекстовый и векторный типы поиска. Скорость индексирования зависит от типа файлов, их размера и загрузки системы и может занять от нескольких секунд до нескольких часов. Индексация файлов выполняется асинхронно. В ответ на запрос создания поискового индекса сервис вернет объект Operation. По нему вы можете узнать статус операции создания поискового индекса.
+
+Созданный поисковый индекс можно подключить к ассистенту. Тогда при запуске модель будет учитывать содержимое поискового индекса и отвечать, используя в первую очередь информацию из него.

@@ -110,6 +110,8 @@ fetch("https://api.xrouter.ru/v1/chat/completions", {
 ```
 
 ### Function Calling
+
+#### GigaChat (нативная поддержка)
 ```typescript
 fetch("https://api.xrouter.ru/v1/chat/completions", {
   method: "POST",
@@ -123,6 +125,51 @@ fetch("https://api.xrouter.ru/v1/chat/completions", {
       role: "user",
       content: "Какая погода в Москве?"
     }],
+    tools: [{
+      type: "function",
+      function: {
+        name: "get_weather",
+        description: "Получить текущую погоду",
+        parameters: {
+          type: "object",
+          properties: {
+            location: {
+              type: "string",
+              description: "Город"
+            },
+            units: {
+              type: "string",
+              enum: ["celsius", "fahrenheit"]
+            }
+          },
+          required: ["location"]
+        }
+      }
+    }]
+  })
+});
+```
+
+#### YandexGPT (эмуляция через промпты)
+```typescript
+fetch("https://api.xrouter.ru/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${API_KEY}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "yandexgpt/latest",
+    messages: [
+      {
+        role: "system",
+        content: "Ты должен отвечать в формате JSON. Структура ответа: { \"location\": string, \"units\": \"celsius\" | \"fahrenheit\" }"
+      },
+      {
+        role: "user",
+        content: "Какая погода в Москве?"
+      }
+    ],
     tools: [{
       type: "function",
       function: {
@@ -211,6 +258,49 @@ fetch("https://api.xrouter.ru/v1/chat/completions", {
         required: ["sentiment", "keywords", "summary"]
       }
     }
+  })
+});
+```
+
+### Использование расширенных параметров
+
+#### GigaChat
+```typescript
+fetch("https://api.xrouter.ru/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${API_KEY}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "gigachat/pro",
+    messages: [{
+      role: "user",
+      content: "Сгенерируй креативный текст"
+    }],
+    temperature: 0.9,
+    top_p: 0.8,
+    repetition_penalty: 1.2
+  })
+});
+```
+
+#### YandexGPT
+```typescript
+fetch("https://api.xrouter.ru/v1/chat/completions", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${API_KEY}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    model: "yandexgpt/latest",
+    messages: [{
+      role: "user",
+      content: "Сгенерируй креативный текст"
+    }],
+    temperature: 0.9,
+    repetition_penalty: 1.2
   })
 });
 ```

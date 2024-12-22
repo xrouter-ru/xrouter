@@ -26,14 +26,18 @@ POST /v1/chat/completions
 #### Request
 ```typescript
 interface ChatCompletionRequest {
-  // Обязательные параметры
-  model: string;              // Идентификатор модели (например, "gigachat/pro")
-  messages: Message[];        // Массив сообщений
+  // Обязательные параметры - один из двух:
+  messages?: Message[];        // Массив сообщений
+  prompt?: string;            // Текстовый промпт (альтернатива messages)
+
+  // Модель (если не указана, используется дефолтная)
+  model?: string;              // Идентификатор модели (например, "gigachat/pro")
 
   // Опциональные параметры
   temperature?: number;       // Диапазон: [0.0, 2.0], по умолчанию 1.0
   max_tokens?: number;       // Максимальное количество токенов
   stream?: boolean;          // Включить streaming ответов
+  seed?: number;            // Seed для воспроизводимости результатов
   
   // Параметры маршрутизации
   provider?: {
@@ -45,15 +49,36 @@ interface ChatCompletionRequest {
 
   // Дополнительные параметры
   tools?: Tool[];           // Инструменты для function calling
+  tool_choice?: "none" | "auto" | { type: "function"; function: { name: string } };
   response_format?: {       // Формат ответа
     type: "json_object" | "text"
   };
+
+  // Расширенные параметры
+  top_p?: number;          // Range: (0, 1]
+  top_k?: number;          // Range: [1, Infinity)
+  min_p?: number;          // Range: [0, 1]
+  top_a?: number;          // Range: [0, 1]
+  frequency_penalty?: number; // Range: [-2, 2]
+  presence_penalty?: number;  // Range: [-2, 2]
+  repetition_penalty?: number; // Range: (0, 2]
+  logit_bias?: { [key: number]: number };
+
+  // Оптимизация латентности
+  prediction?: {
+    type: "content";
+    content: string;
+  };
+
+  // Трансформации промптов
+  transforms?: string[];
 }
 
 interface Message {
   role: "system" | "user" | "assistant" | "tool";
   content: string | ContentPart[];
   name?: string;           // Опционально для non-OpenAI моделей
+  tool_call_id?: string;   // Для сообщений с ролью tool
 }
 
 interface ContentPart {
@@ -71,6 +96,10 @@ interface Tool {
     name: string;
     description?: string;
     parameters: object;   // JSON Schema
+    few_shot_examples?: Array<{
+      request: string;
+      params: object;
+    }>;
   };
 }
 ```
@@ -82,6 +111,7 @@ interface ChatCompletionResponse {
   object: "chat.completion" | "chat.completion.chunk";
   created: number;
   model: string;
+  system_fingerprint?: string;
   choices: {
     index: number;
     message: {
@@ -89,7 +119,12 @@ interface ChatCompletionResponse {
       content: string;
       tool_calls?: ToolCall[];
     };
-    finish_reason: string;
+    finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | null;
+    delta?: {              // Только для streaming
+      content?: string;
+      role?: string;
+      tool_calls?: ToolCall[];
+    };
   }[];
   usage?: {
     prompt_tokens: number;
@@ -146,6 +181,13 @@ interface ModelsResponse {
       prompt_tokens: number | null;
       completion_tokens: number | null;
     };
+    supported_parameters: string[];
+    default_parameters: {
+      temperature: number;
+      top_p: number;
+      frequency_penalty: number;
+      presence_penalty: number;
+    };
   }[];
 }
 ```
@@ -200,7 +242,6 @@ interface ParametersResponse {
     top_p_p50: number;
     frequency_penalty_p50: number;
     presence_penalty_p50: number;
-    // ... другие параметры
   };
 }
 ```
@@ -236,7 +277,13 @@ interface ErrorResponse {
   error: {
     code: number;
     message: string;
-    metadata?: Record<string, unknown>;
+    metadata?: {
+      provider_name?: string;
+      raw?: unknown;
+      reasons?: string[];
+      flagged_input?: string;
+      model_slug?: string;
+    };
   };
 }
 ```
