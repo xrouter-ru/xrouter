@@ -166,9 +166,9 @@ interface CacheService {
 
 interface CacheConfig {
   defaultTTL: number;
-  rateLimitTTL: number;     // TTL для rate limiting счетчиков
-  tokenTTL: number;         // TTL для API ключей и OAuth токенов
-  monitoringTTL: number;    // TTL для метрик и статусов провайдеров
+  rateLimitTTL: number;     // TTL для rate limiting счетчиков (минуты)
+  apiKeyCacheTTL: number;   // TTL для кэша валидации ключей (минуты)
+  monitoringTTL: number;    // TTL для метрик и статусов (минуты)
 }
 ```
 
@@ -180,10 +180,9 @@ interface CacheConfig {
    - Защита от DDoS
    - Квоты на использование
 
-2. Кэширование токенов:
-   - Быстрая валидация API ключей
-   - Хранение OAuth токенов
-   - Временные ключи доступа
+2. Кэширование API ключей:
+   - Быстрая валидация через кэш
+   - Снижение нагрузки на БД
 
 3. Мониторинг провайдеров:
    - Статус доступности в реальном времени
