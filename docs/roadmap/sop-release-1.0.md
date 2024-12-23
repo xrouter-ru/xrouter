@@ -1,36 +1,85 @@
-# SOP: Release 1.0 - Foundation (Python MVP)
+# SOP: Release 1.0 - Foundation (Python)
 
 ## 1. Подготовка инфраструктуры
 
 ### 1.1. Настройка монорепозитория
 - [ ] Создать базовую структуру проекта
-  - [ ] Настроить директории (src, tests, docs)
+  - [ ] Настроить директории (src/xrouter, tests, docs)
   - [ ] Создать .gitignore
   - [ ] Настроить editorconfig
 - [ ] Настроить Python окружение
-  - [ ] Создать venv
-  - [ ] Настроить poetry
-  - [ ] Настроить pyproject.toml
+  ```toml
+  [tool.poetry.dependencies]
+  python = "^3.11"
+  fastapi = "^0.104.1"
+  uvicorn = "^0.24.0"
+  sqlalchemy = "^2.0.23"
+  aiosqlite = "^0.19.0"
+  redis = "^5.0.1"
+  pydantic = "^2.5.2"
+  httpx = "^0.25.2"
+  tiktoken = "^0.5.1"
+  prometheus-client = "^0.19.0"
+  structlog = "^23.2.0"
+
+  [tool.poetry.dev-dependencies]
+  black = "^23.11.0"
+  isort = "^5.12.0"
+  flake8 = "^6.1.0"
+  pytest = "^7.4.3"
+  pytest-asyncio = "^0.21.1"
+  pytest-cov = "^4.1.0"
+  pytest-env = "^1.1.1"
+  ```
 - [ ] Настроить линтеры и форматтеры
   - [ ] black для форматирования
   - [ ] isort для импортов
   - [ ] flake8 для линтинга
   - [ ] pre-commit хуки
-- [ ] Настроить тестовое окружение
-  - [ ] pytest
-  - [ ] pytest-asyncio
-  - [ ] pytest-cov
-  - [ ] pytest-mock
 
 ### 1.2. Настройка хранилищ
 - [ ] Настроить SQLite
   - [ ] Создать схему базы данных
+    ```sql
+    -- API Keys
+    CREATE TABLE api_keys (
+        id TEXT PRIMARY KEY,
+        key_hash TEXT NOT NULL,
+        name TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP,
+        last_used_at TIMESTAMP
+    );
+
+    -- Usage Records
+    CREATE TABLE usage (
+        id TEXT PRIMARY KEY,
+        api_key_id TEXT REFERENCES api_keys(id),
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        tokens_input INTEGER NOT NULL,
+        tokens_output INTEGER NOT NULL,
+        cost DECIMAL(10,6) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Provider Status
+    CREATE TABLE provider_status (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        status TEXT NOT NULL,
+        latency INTEGER,
+        error_rate DECIMAL(5,2),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ```
   - [ ] Настроить alembic миграции
   - [ ] Настроить бэкапы
 - [ ] Настроить Redis
   - [ ] Установить Redis
   - [ ] Настроить rate limiting
-  - [ ] Настроить кэширование API ключей
+  - [ ] Настроить кэширование статистики
 - [ ] Настроить SQLAlchemy
   - [ ] Создать модели
   - [ ] Настроить сессии
@@ -42,31 +91,70 @@
   - [ ] Создать алерты
   - [ ] Настроить экспортеры
 - [ ] Настроить Grafana
-  - [ ] Создать дашборды
+  - [ ] Создать дашборды для токенов/кредитов
   - [ ] Настроить визуализации
   - [ ] Настроить алерты
 - [ ] Настроить логирование
-  - [ ] Настроить loguru
+  - [ ] Настроить structlog
   - [ ] Настроить форматы логов
   - [ ] Настроить ротацию
 
 ## 2. Разработка Core API
 
-### 2.1. OAuth и API Gateway
-- [ ] Реализовать OAuth 2.0
-  - [ ] PKCE flow
-  - [ ] JWT токены (1 год)
-  - [ ] Отзыв токенов
+### 2.1. API Gateway и Auth
 - [ ] Создать базовый FastAPI сервер
-  - [ ] Настроить middleware
-  - [ ] Настроить роутинг
-  - [ ] Добавить валидацию
-- [ ] Реализовать управление ключами
-  - [ ] UI для управления
-  - [ ] API ключи
+  ```python
+  app/
+  ├── api/
+  │   ├── __init__.py
+  │   ├── router.py
+  │   └── endpoints/
+  │       ├── __init__.py
+  │       └── chat.py
+  ├── core/
+  │   ├── __init__.py
+  │   ├── config.py
+  │   └── security.py
+  ├── db/
+  │   ├── __init__.py
+  │   └── models.py
+  └── services/
+      ├── __init__.py
+      ├── usage.py
+      └── providers/
+          ├── __init__.py
+          └── gigachat.py
+  ```
+- [ ] Настроить middleware
+- [ ] Настроить роутинг
+- [ ] Добавить валидацию
+- [ ] Реализовать API Key аутентификацию
+  - [ ] Валидация ключей
   - [ ] Rate limiting
+  - [ ] Логирование доступа
 
-### 2.2. GigaChat Provider
+### 2.2. Usage Service
+- [ ] Реализовать базовый функционал
+  ```python
+  class UsageService:
+      async def calculate_tokens(self, request: Request) -> TokenCount:
+          pass
+      
+      async def record_usage(self, usage: Usage) -> None:
+          pass
+      
+      async def get_usage_stats(self, api_key: str) -> UsageStats:
+          pass
+      
+      async def check_limits(self, api_key: str) -> LimitCheck:
+          pass
+  ```
+- [ ] Добавить подсчет токенов
+- [ ] Реализовать учет кредитов
+- [ ] Добавить кэширование в Redis
+- [ ] Настроить метрики использования
+
+### 2.3. GigaChat Provider
 - [ ] Реализовать GigaChat адаптер
   - [ ] Создать базовый класс
   - [ ] Добавить аутентификацию
@@ -80,7 +168,7 @@
   - [ ] Интеграционные тесты
   - [ ] Тесты производительности
 
-### 2.3. Router Service
+### 2.4. Router Service
 - [ ] Реализовать базовую маршрутизацию
   - [ ] Создать Router класс
   - [ ] Добавить логику выбора провайдера
@@ -97,10 +185,14 @@
 ## 3. Тестирование
 
 ### 3.1. Unit тестирование
-- [ ] Тесты OAuth и API Gateway
-  - [ ] Тесты PKCE flow
-  - [ ] Тесты JWT
+- [ ] Тесты API Gateway
+  - [ ] Тесты валидации запросов
   - [ ] Тесты API ключей
+  - [ ] Тесты rate limiting
+- [ ] Тесты Usage Service
+  - [ ] Тесты подсчета токенов
+  - [ ] Тесты учета кредитов
+  - [ ] Тесты лимитов
 - [ ] Тесты Provider адаптера
   - [ ] Тесты подключения
   - [ ] Тесты запросов
@@ -112,7 +204,7 @@
 
 ### 3.2. Интеграционное тестирование
 - [ ] Тесты взаимодействия компонентов
-  - [ ] OAuth + Gateway
+  - [ ] Gateway + Usage Service
   - [ ] Gateway + Router
   - [ ] Router + Provider
 - [ ] Тесты производительности
@@ -132,9 +224,9 @@
   - [ ] Добавить примеры
   - [ ] Описать ошибки
 - [ ] Документировать аутентификацию
-  - [ ] OAuth PKCE flow
   - [ ] API ключи
   - [ ] Rate limiting
+  - [ ] Лимиты использования
 - [ ] Создать примеры использования
   - [ ] Curl примеры
   - [ ] Python примеры
@@ -176,7 +268,8 @@
   - [ ] Настроить Redis
   - [ ] Применить миграции
 - [ ] Развернуть сервисы
-  - [ ] OAuth и API Gateway
+  - [ ] API Gateway
+  - [ ] Usage Service
   - [ ] Router Service
   - [ ] Мониторинг
 - [ ] Настроить SSL/TLS
@@ -186,8 +279,8 @@
 
 ### 5.3. Пост-развертывание
 - [ ] Проверить работоспособность
-  - [ ] OAuth flow
   - [ ] API endpoints
+  - [ ] Учет токенов
   - [ ] Маршрутизация
 - [ ] Мониторить производительность
   - [ ] Latency
@@ -201,8 +294,9 @@
 ## 6. Критерии приемки
 
 ### 6.1. Функциональные требования
-- [ ] OAuth PKCE работает корректно
-- [ ] UI управления ключами функционирует
+- [ ] API Gateway работает и доступен
+- [ ] API key аутентификация работает корректно
+- [ ] Учет токенов и кредитов точный
 - [ ] GigaChat интеграция работает
 - [ ] Маршрутизация работает правильно
 - [ ] Мониторинг предоставляет данные
