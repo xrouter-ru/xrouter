@@ -38,6 +38,8 @@ def setup_di(app: FastAPI, settings: Settings) -> None:
             Database: ApplicationContainer.get_database,
             RedisClient: ApplicationContainer.get_redis_client,
             ProviderManager: ApplicationContainer.get_provider_manager,
+            UsageService: ApplicationContainer.get_usage_service,
+            RouterService: ApplicationContainer.get_router_service,
         }
     )
 
@@ -46,8 +48,6 @@ def setup_di(app: FastAPI, settings: Settings) -> None:
         {
             RateLimiter: RequestContainer.rate_limiter,
             TokenCounter: RequestContainer.token_counter,
-            UsageService: RequestContainer.usage_service,
-            RouterService: RequestContainer.router_service,
         }
     )
 
@@ -68,14 +68,14 @@ def get_di_dependencies() -> dict[type, Callable[[], Any]]:
         Dictionary mapping types to their provider functions
     """
     return {
-        # Application-level dependencies
+        # Application-level dependencies (синглтоны)
         Settings: ApplicationContainer.get_settings,
         Database: ApplicationContainer.get_database,
         RedisClient: ApplicationContainer.get_redis_client,
         ProviderManager: ApplicationContainer.get_provider_manager,
-        # Request-level dependencies
+        UsageService: ApplicationContainer.get_usage_service,
+        RouterService: ApplicationContainer.get_router_service,
+        # Request-level dependencies (новый инстанс на каждый запрос)
         RateLimiter: RequestContainer.rate_limiter,
         TokenCounter: RequestContainer.token_counter,
-        UsageService: RequestContainer.usage_service,
-        RouterService: RequestContainer.router_service,
     }

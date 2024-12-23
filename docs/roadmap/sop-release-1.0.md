@@ -327,7 +327,28 @@
 
 ## 2. Разработка сервисов
 
-### 2.1. Usage Service
+### 2.1. Core Services Setup
+
+#### Реализация
+- [x] Настроить базовую структуру сервисов
+  ```python
+  # core/services.py
+  class CoreServices:
+      """Base class for all services with common dependencies."""
+      def __init__(
+          self,
+          database: Database,
+          cache: RedisClient,
+          logger: LoggerService,
+          metrics: MetricsService
+      ):
+          self.database = database
+          self.cache = cache
+          self.logger = logger
+          self.metrics = metrics
+  ```
+
+### 2.2. Usage Service
 
 #### Реализация
 - [ ] Создать базовые модели данных
@@ -665,6 +686,77 @@
 
 #### Реализация
 - [ ] Создать FastAPI приложение
+
+- [ ] Реализовать DI контейнеры
+  ```python
+  # di/containers/application.py
+  class ApplicationContainer:
+      """Container for application-level dependencies."""
+      def __init__(self, config: Config):
+          # Core services
+          self.config = config
+          self.logger = LoggerService(config)
+          self.database = DatabaseService(config)
+          self.cache = CacheService(config)
+          self.metrics = MetricsService(config)
+
+          # Business services
+          self.usage_service = UsageService(
+              database=self.database,
+              cache=self.cache,
+              logger=self.logger,
+              metrics=self.metrics
+          )
+          self.provider_manager = ProviderManager(
+              config=self.config,
+              metrics=self.metrics,
+              logger=self.logger
+          )
+          self.router_service = RouterService(
+              provider_manager=self.provider_manager,
+              usage_service=self.usage_service,
+              metrics=self.metrics,
+              logger=self.logger
+          )
+
+  # di/containers/request.py
+  class RequestContainer:
+      """Container for request-level dependencies."""
+      def __init__(self, app: ApplicationContainer):
+          self.config = app.config
+          self.logger = app.logger
+          self.database = app.database
+          self.cache = app.cache
+          self.metrics = app.metrics
+          
+          # Request-scoped services
+          self.rate_limiter = RateLimiter(
+              redis_client=self.cache,
+              settings=self.config
+          )
+          self.token_counter = TokenCounter(
+              provider_manager=app.provider_manager,
+              settings=self.config
+          )
+
+  # di/setup.py
+  def setup_di(app: FastAPI, settings: Settings) -> None:
+      """Setup dependency injection for FastAPI application."""
+      app_container = ApplicationContainer(settings)
+      
+      # Register dependencies
+      app.dependency_overrides.update({
+          Settings: lambda: app_container.config,
+          LoggerService: lambda: app_container.logger,
+          DatabaseService: lambda: app_container.database,
+          CacheService: lambda: app_container.cache,
+          MetricsService: lambda: app_container.metrics,
+          UsageService: lambda: app_container.usage_service,
+          ProviderManager: lambda: app_container.provider_manager,
+          RouterService: lambda: app_container.router_service,
+          RequestContainer: lambda: RequestContainer(app_container)
+      })
+  ```
   ```python
   # api/app.py
   from fastapi import FastAPI, Depends, HTTPException
@@ -772,6 +864,11 @@
   ```
 
 #### Критерии приемки
+- [x] DI контейнеры работают корректно
+  - Синглтоны инициализируются при старте приложения
+  - Зависимости уровня запроса создаются для каждого запроса
+  - Очистка ресурсов работает при shutdown
+  - Типизация и валидация зависимостей работает
 - [ ] API работает корректно
   - Все endpoints доступны
   - Валидация работает

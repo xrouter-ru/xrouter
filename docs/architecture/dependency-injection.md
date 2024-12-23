@@ -6,150 +6,168 @@ The application uses constructor-based dependency injection with two levels of c
 1. Application Container - for long-lived singleton services
 2. Request Container - for request-scoped services
 
-## Application Container
+## Release Plan
 
-### Singleton Services
+### Release 1.0 - Foundation
 
+#### Application Container
 ```python
-class DatabaseService:
-    def __init__(self, config: Config):
-        self.engine = create_engine(config.SQLITE_URL)
-        self.session_factory = sessionmaker(bind=self.engine)
-
-class CacheService:
-    def __init__(self, config: Config):
-        self.redis = Redis.from_url(config.REDIS_URL)
-
-class MetricsService:
-    def __init__(self, config: Config):
-        self.client = PrometheusClient()
-
-class LoggerService:
-    def __init__(self, config: Config):
-        self.logger = structlog.get_logger()
-
 class ApplicationContainer:
     def __init__(self, config: Config):
         # Core services
         self.config = config
-        self.logger = LoggerService(config)
-        self.database = DatabaseService(config)
-        self.cache = CacheService(config)
-        self.metrics = MetricsService(config)
+        self.database = DatabaseService(config)  # SQLite
+        self.cache = CacheService(config)        # Redis
+
+        # Business services
+        self.usage_service = UsageService(
+            database=self.database,
+            cache=self.cache
+        )
+
+        self.provider_manager = ProviderManager(
+            config=self.config,
+            cache=self.cache
+        )
+
+        self.router = RouterService(
+            provider_manager=self.provider_manager,
+            usage_service=self.usage_service
+        )
 
     def create_request_container(self) -> 'RequestContainer':
         return RequestContainer(self)
 ```
 
-## Request Container
-
-### Request-Scoped Services
-
+#### Request Container
 ```python
-class UsageService:
-    def __init__(
-        self,
-        database: DatabaseService,
-        cache: CacheService,
-        metrics: MetricsService,
-        logger: LoggerService
-    ):
-        self.database = database
-        self.cache = cache
-        self.metrics = metrics
-        self.logger = logger
-
-class GigaChatProvider:
-    def __init__(
-        self,
-        config: Config,
-        metrics: MetricsService,
-        logger: LoggerService
-    ):
-        self.client = GigaChatClient(config.GIGACHAT_API_KEY)
-        self.metrics = metrics
-        self.logger = logger
-
-class ProviderManager:
-    def __init__(
-        self,
-        config: Config,
-        metrics: MetricsService,
-        logger: LoggerService
-    ):
-        self.providers = {
-            "gigachat": GigaChatProvider(config, metrics, logger)
-        }
-        self.metrics = metrics
-        self.logger = logger
-
-class RouterService:
-    def __init__(
-        self,
-        provider_manager: ProviderManager,
-        usage_service: UsageService,
-        metrics: MetricsService,
-        logger: LoggerService
-    ):
-        self.provider_manager = provider_manager
-        self.usage_service = usage_service
-        self.metrics = metrics
-        self.logger = logger
-
 class RequestContainer:
     def __init__(self, app: ApplicationContainer):
-        # Application services
+        # Core services
         self.config = app.config
-        self.logger = app.logger
         self.database = app.database
         self.cache = app.cache
-        self.metrics = app.metrics
 
-        # Request services
+        # Request-scoped services
+        self.rate_limiter = RateLimiter(
+            cache=self.cache,
+            config=self.config
+        )
+
+        self.token_counter = TokenCounter(
+            provider_manager=app.provider_manager
+        )
+
+        self.usage_tracker = UsageTracker(
+            database=self.database,
+            cache=self.cache
+        )
+```
+
+### Release 1.1 - Enhancement
+
+#### Application Container
+```python
+class ApplicationContainer:
+    def __init__(self, config: Config):
+        # Core services
+        self.config = config
+        self.logger = LoggerService(config)
+        self.database = DatabaseService(config)  # PostgreSQL
+        self.cache = CacheService(config)        # Redis
+        self.metrics = MetricsService(config)    # Prometheus
+
+        # Business services
         self.usage_service = UsageService(
             database=self.database,
             cache=self.cache,
             metrics=self.metrics,
             logger=self.logger
         )
-        
+
         self.provider_manager = ProviderManager(
             config=self.config,
             metrics=self.metrics,
             logger=self.logger
         )
-        
+
         self.router = RouterService(
             provider_manager=self.provider_manager,
             usage_service=self.usage_service,
             metrics=self.metrics,
             logger=self.logger
         )
+
+    def create_request_container(self) -> 'RequestContainer':
+        return RequestContainer(self)
 ```
 
-## Usage Example
-
+#### Request Container
 ```python
-# Application startup
-config = Config()
-app_container = ApplicationContainer(config)
+class RequestContainer:
+    def __init__(self, app: ApplicationContainer):
+        # Core services
+        self.config = app.config
+        self.logger = app.logger
+        self.database = app.database
+        self.cache = app.cache
+        self.metrics = app.metrics
 
-# Request handling
-@app.post("/v1/chat/completions")
-async def create_chat_completion(
-    request: ChatRequest,
-    container: RequestContainer = Depends(get_request_container)
-):
-    try:
-        return await container.router.route_request(request)
-    except Exception as e:
-        container.logger.error("Request failed", error=e)
-        raise
+        # Request-scoped services
+        self.rate_limiter = RateLimiter(
+            cache=self.cache,
+            metrics=self.metrics,
+            logger=self.logger
+        )
 
-# FastAPI dependency
-def get_request_container() -> RequestContainer:
-    return app_container.create_request_container()
+        self.token_counter = TokenCounter(
+            provider_manager=app.provider_manager,
+            metrics=self.metrics
+        )
+
+        self.usage_tracker = UsageTracker(
+            database=self.database,
+            cache=self.cache,
+            metrics=self.metrics,
+            logger=self.logger
+        )
 ```
+
+## Service Dependencies
+
+### Release 1.0
+- Core Services:
+  * Config: Application settings
+  * Database: SQLite connection and migrations
+  * Cache: Redis for rate limiting and caching
+
+- Business Services:
+  * Usage Service: Token counting and usage tracking
+  * Provider Manager: GigaChat integration
+  * Router Service: Basic request routing
+
+- Request Services:
+  * Rate Limiter: Basic rate limiting
+  * Token Counter: Token estimation
+  * Usage Tracker: Usage recording
+
+### Release 1.1
+- Core Services:
+  * Config: Enhanced settings
+  * Logger: Structured logging
+  * Database: PostgreSQL with migrations
+  * Cache: Enhanced Redis functionality
+  * Metrics: Prometheus metrics
+
+- Business Services:
+  * Usage Service: Advanced usage tracking
+  * Provider Manager: Multiple providers
+  * Router Service: Smart routing
+
+- Request Services:
+  * Rate Limiter: Advanced rate limiting
+  * Token Counter: Precise token counting
+  * Usage Tracker: Detailed usage tracking
 
 ## Benefits
 
