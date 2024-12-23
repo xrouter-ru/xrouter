@@ -48,13 +48,15 @@ coverage.xml
 .mypy_cache/
 htmlcov/
 test.db
-
 # Project specific
-*.db
-*.sqlite3
-*.sqlite
+data/*
+!data/.gitkeep
+!data/*/
+data/*/*
+!data/*/.gitkeep
 .env.*
 !.env.example
+
 
 # Logs
 *.log

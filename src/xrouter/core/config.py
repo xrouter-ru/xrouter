@@ -27,7 +27,7 @@ class Settings(BaseSettings):
         raise ValueError(v)
 
     # Database
-    SQLITE_URL: str = "sqlite+aiosqlite:///xrouter.db"
+    SQLITE_URL: str = "sqlite+aiosqlite:///data/sqlite/xrouter.db"
     DB_ECHO: bool = False
 
     # Redis
