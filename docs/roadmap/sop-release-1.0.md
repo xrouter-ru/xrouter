@@ -107,7 +107,7 @@
 ### 1.2. Настройка хранилищ
 
 #### SQLite
-- [ ] Создать схему базы данных
+- [x] Создать схему базы данных
   ```sql
   -- api_keys.sql
   CREATE TABLE api_keys (
@@ -143,66 +143,186 @@
   );
   ```
 
-- [ ] Настроить SQLAlchemy модели
+- [x] Настроить SQLAlchemy модели с современным синтаксисом 2.0
   ```python
   # db/models.py
-  from sqlalchemy import Column, String, Integer, Numeric, DateTime, ForeignKey
-  from sqlalchemy.ext.declarative import declarative_base
+  from datetime import datetime
+  from typing import Optional
+  from uuid import UUID
 
-  Base = declarative_base()
+  from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, func
+  from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+  class Base(DeclarativeBase):
+      """Base class for all SQLAlchemy models."""
 
   class APIKey(Base):
       __tablename__ = "api_keys"
-      id = Column(String, primary_key=True)
-      key_hash = Column(String, nullable=False)
-      name = Column(String)
-      created_at = Column(DateTime, server_default=func.now())
-      expires_at = Column(DateTime)
-      last_used_at = Column(DateTime)
+
+      id: Mapped[UUID] = mapped_column(primary_key=True)
+      key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+      name: Mapped[Optional[str]] = mapped_column(String(255))
+      created_at: Mapped[datetime] = mapped_column(
+          DateTime(timezone=True), server_default=func.now()
+      )
+      expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+      last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+      # Relationships
+      usage_records: Mapped[list["Usage"]] = relationship(back_populates="api_key")
 
   class Usage(Base):
       __tablename__ = "usage"
-      id = Column(String, primary_key=True)
-      api_key_id = Column(String, ForeignKey("api_keys.id"))
-      provider = Column(String, nullable=False)
-      model = Column(String, nullable=False)
-      tokens_input = Column(Integer, nullable=False)
-      tokens_output = Column(Integer, nullable=False)
-      cost = Column(Numeric(10, 6), nullable=False)
-      created_at = Column(DateTime, server_default=func.now())
+
+      id: Mapped[UUID] = mapped_column(primary_key=True)
+      api_key_id: Mapped[UUID] = mapped_column(ForeignKey("api_keys.id"))
+      provider: Mapped[str] = mapped_column(String(50), nullable=False)
+      model: Mapped[str] = mapped_column(String(50), nullable=False)
+      tokens_input: Mapped[int] = mapped_column(Integer, nullable=False)
+      tokens_output: Mapped[int] = mapped_column(Integer, nullable=False)
+      cost: Mapped[float] = mapped_column(Numeric(10, 6), nullable=False)
+      created_at: Mapped[datetime] = mapped_column(
+          DateTime(timezone=True), server_default=func.now()
+      )
+
+      # Relationships
+      api_key: Mapped["APIKey"] = relationship(back_populates="usage_records")
+  ```
+
+- [x] Настроить асинхронную работу с базой данных
+  ```python
+  # db/database.py
+  from contextlib import asynccontextmanager
+  from typing import AsyncGenerator
+
+  from sqlalchemy.ext.asyncio import (
+      AsyncEngine,
+      AsyncSession,
+      async_sessionmaker,
+      create_async_engine,
+  )
+
+  class Database:
+      def __init__(self) -> None:
+          self.engine: AsyncEngine = create_async_engine(
+              settings.SQLITE_URL,
+              echo=settings.DB_ECHO,
+              pool_pre_ping=True,
+          )
+          self.async_session_maker = async_sessionmaker(
+              self.engine,
+              class_=AsyncSession,
+              expire_on_commit=False,
+          )
+
+      @asynccontextmanager
+      async def session(self) -> AsyncGenerator[AsyncSession, None]:
+          async with self.async_session_maker() as session:
+              try:
+                  yield session
+                  await session.commit()
+              except Exception:
+                  await session.rollback()
+                  raise
+  ```
+
+- [x] Настроить миграции с Alembic
+  ```ini
+  # alembic.ini
+  [alembic]
+  script_location = migrations
+  sqlalchemy.url = sqlite+aiosqlite:///xrouter.db
+
+  [loggers]
+  keys = root,sqlalchemy,alembic
+  ```
+  ```python
+  # migrations/env.py
+  from alembic import context
+  from sqlalchemy import pool
+  from sqlalchemy.ext.asyncio import async_engine_from_config
+
+  from xrouter.db.models import Base
+
+  target_metadata = Base.metadata
+
+  async def run_migrations() -> None:
+      configuration = config.get_section(config.config_ini_section)
+      configuration["sqlalchemy.url"] = settings.SQLITE_URL
+      connectable = async_engine_from_config(
+          configuration,
+          prefix="sqlalchemy.",
+          poolclass=pool.NullPool,
+      )
+
+      async with connectable.connect() as connection:
+          await connection.run_sync(do_run_migrations)
   ```
 
 #### Redis
-- [ ] Настроить схемы кэширования
+- [x] Настроить схемы кэширования и rate limiting
   ```python
   # core/cache.py
+  from typing import Any, Optional
+  from redis.asyncio import Redis
+
   class RedisKeys:
       # Rate Limiting
       RATE_LIMIT = "rate:{api_key}:{window}"
-      
+
       # Usage Stats
       USAGE_COUNTER = "usage:{api_key}:counter"
       USAGE_HISTORY = "usage:{api_key}:history"
-      
+
       # Provider Status
       PROVIDER_STATUS = "provider:{name}:status"
       MODEL_STATUS = "model:{name}:status"
   ```
 
-- [ ] Реализовать базовый Redis клиент
+- [x] Реализовать базовый Redis клиент с типизацией
   ```python
   # core/cache.py
   class RedisClient:
-      def __init__(self, redis: Redis):
+      def __init__(self, redis: Redis[Any]) -> None:
           self.redis = redis
 
-      async def increment_rate_limit(self, api_key: str, window: str) -> int:
-          key = RedisKeys.RATE_LIMIT.format(api_key=api_key, window=window)
-          return await self.redis.incr(key)
+      async def get_rate_limit(self, api_key: str) -> int:
+          key = RedisKeys.RATE_LIMIT.format(api_key=api_key)
+          count: Optional[bytes] = await self.redis.get(key)
+          return int(count.decode()) if count else 0
+
+      async def increment_rate_limit(self, api_key: str) -> int:
+          key = RedisKeys.RATE_LIMIT.format(api_key=api_key)
+          count = await self.redis.incr(key)
+          if count == 1:
+              await self.redis.expire(key, 60)  # 1 minute window
+          return count
 
       async def get_usage_counter(self, api_key: str) -> int:
           key = RedisKeys.USAGE_COUNTER.format(api_key=api_key)
-          return await self.redis.get(key) or 0
+          count: Optional[bytes] = await self.redis.get(key)
+          return int(count.decode()) if count else 0
+  ```
+
+- [x] Настроить mypy для работы с Redis
+  ```toml
+  # pyproject.toml
+  [tool.mypy]
+  python_version = "3.11"
+  plugins = []
+  warn_return_any = true
+  warn_unused_configs = true
+  disallow_untyped_defs = true
+  check_untyped_defs = true
+  ignore_missing_imports = true
+  follow_imports = "silent"
+  disallow_any_generics = false
+  disallow_subclassing_any = false
+
+  [[tool.mypy.overrides]]
+  module = "redis.*"
+  ignore_missing_imports = true
+  follow_imports = "skip"
   ```
 
 ## 2. Разработка сервисов
@@ -249,7 +369,7 @@
       async def calculate_tokens(self, request: Request) -> TokenCount:
           # Подсчет токенов через tiktoken
           encoding = tiktoken.encoding_for_model(request.model)
-          input_tokens = sum(len(encoding.encode(msg.content)) 
+          input_tokens = sum(len(encoding.encode(msg.content))
                            for msg in request.messages)
           return TokenCount(
               input=input_tokens,
@@ -377,7 +497,7 @@
           # GigaChat использует GPT-3.5 tokenizer
           encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
           return TokenCount(
-              input=sum(len(encoding.encode(msg.content)) 
+              input=sum(len(encoding.encode(msg.content))
                        for msg in messages),
               output=0,  # Будет заполнено после ответа
               model=self.model
@@ -391,10 +511,10 @@
   async def test_create_completion():
       client = MockGigaChatClient()
       provider = GigaChatProvider(client)
-      
+
       messages = [Message(role="user", content="Hello")]
       response = await provider.create_completion(messages)
-      
+
       assert response.choices[0].message.content
       assert response.usage.total_tokens > 0
 
@@ -411,10 +531,10 @@
   async def test_real_api_call():
       client = GigaChatClient(os.getenv("GIGACHAT_API_KEY"))
       provider = GigaChatProvider(client)
-      
+
       messages = [Message(role="user", content="Привет")]
       response = await provider.create_completion(messages)
-      
+
       assert response.choices[0].message.content
       assert isinstance(response.choices[0].message.content, str)
       assert response.usage.total_tokens > 0
@@ -461,7 +581,7 @@
 
           # Получаем провайдера
           provider = self.get_provider(request.model)
-          
+
           # Выполняем запрос
           response = await provider.create_completion(
               request.messages,
@@ -521,7 +641,7 @@
 
       # Проверяем результат
       assert response.choices[0].message.content
-      
+
       # Проверяем запись использования
       usage = await usage_service.get_usage("test-key")
       assert usage.tokens.total > 0
@@ -674,18 +794,18 @@
   class Settings(BaseSettings):
       # Database
       SQLITE_URL: str = "sqlite:///xrouter.db"
-      
+
       # Redis
       REDIS_URL: str = "redis://localhost:6379"
-      
+
       # GigaChat
       GIGACHAT_API_KEY: str
       GIGACHAT_BASE_URL: str = "https://gigachat.api.url"
-      
+
       # API
       API_CORS_ORIGINS: list[str] = ["*"]
       API_RATE_LIMIT: int = 100  # requests per minute
-      
+
       class Config:
           env_file = ".env"
   ```
