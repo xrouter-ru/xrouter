@@ -2,40 +2,40 @@
 
 ## Release Overview
 
-### Release 1.0 - MVP (Python)
-**Focus**: OAuth, API Gateway, and GigaChat integration
+### Release 1.0 - Foundation (Python)
+**Focus**: API Gateway and GigaChat integration
 **Timeline**: 4 weeks
 
 #### Key Features:
-1. OAuth 2.0 with PKCE
-2. API key management UI
-3. Basic API Gateway
-4. GigaChat integration
+1. API key management with UI
+2. Basic API Gateway with rate limiting (Redis)
+3. GigaChat integration
+4. SQLite for data storage
 5. Core monitoring
 
 #### Success Criteria:
-- OAuth and API keys working
+- API key authentication working
 - Successfully route requests to GigaChat
 - Response time < 500ms (without provider latency)
 - Error rate < 1%
 
 ---
 
-### Release 1.1 - YandexGPT
-**Focus**: Add YandexGPT support with versioning
-**Timeline**: 3 weeks
+### Release 1.1 - YandexGPT & OAuth
+**Focus**: Add YandexGPT support and enhance auth
+**Timeline**: 4 weeks
 
 #### Key Features:
-1. YandexGPT integration
-2. Version support (:latest, :rc, :deprecated)
-3. Enhanced error handling
-4. Basic fallback mechanisms
-5. Enhanced monitoring
+1. OAuth 2.0 with PKCE implementation
+2. YandexGPT integration with versions
+3. Migration to PostgreSQL
+4. Enhanced Redis usage
+5. Advanced monitoring
 
 #### Success Criteria:
-- All YandexGPT versions working
-- Automatic fallback working
-- Response time maintained
+- OAuth 2.0 and API keys working
+- All YandexGPT versions supported
+- Successful PostgreSQL migration
 - Error rate < 0.5%
 
 ---
@@ -45,11 +45,11 @@
 **Timeline**: 4 weeks
 
 #### Key Features:
-1. OAuth service in Go
-2. API Gateway in Go
-3. Rate limiting
-4. Basic monitoring
-5. Performance optimization
+1. Core services in Go
+2. Enhanced rate limiting
+3. Performance optimization
+4. Advanced monitoring
+5. Migration utilities
 
 #### Success Criteria:
 - All core features working
@@ -97,13 +97,20 @@
 
 ## Development Phases
 
-### Phase 1 (MVP - Python)
-- OAuth and key management
-- Basic provider integration
+### Phase 1 (Foundation - Python)
+- API key management
+- Basic provider integration (GigaChat)
 - Simple routing
 - Basic monitoring
+- SQLite storage
 
-### Phase 2 (Production - Go)
+### Phase 2 (Enhancement - Python)
+- OAuth implementation
+- YandexGPT integration
+- PostgreSQL migration
+- Enhanced monitoring
+
+### Phase 3 (Production - Go)
 - Core services rewrite
 - Infrastructure setup
 - Enterprise features
@@ -115,9 +122,9 @@
 gantt
     title XRouter Release Schedule
     dateFormat  YYYY-MM-DD
-    section MVP Phase
+    section Foundation Phase
     Release 1.0    :2024-01-01, 4w
-    Release 1.1    :after Release 1.0, 3w
+    Release 1.1    :after Release 1.0, 4w
     section Production Phase
     Release 1.2    :after Release 1.1, 4w
     Release 2.0    :after Release 1.2, 4w
@@ -127,13 +134,15 @@ gantt
 ## Release Dependencies
 
 ### Infrastructure Dependencies
-- Cloud infrastructure setup
-- Database setup
+- Redis setup (Release 1.0)
+- SQLite setup (Release 1.0)
+- PostgreSQL migration (Release 1.1)
 - Monitoring setup
 - CI/CD pipeline
 
 ### External Dependencies
-- Provider API access
+- GigaChat API access
+- YandexGPT API access
 - API documentation
 - Test accounts
 - Production credentials
@@ -143,14 +152,14 @@ gantt
 ### Release Risks
 1. Provider API changes
 2. Performance issues
-3. Security vulnerabilities
-4. Migration complexity
+3. Database migration complexity
+4. Security vulnerabilities
 
 ### Mitigation Strategies
 1. Regular provider communication
 2. Performance testing
-3. Security audits
-4. Comprehensive testing
+3. Migration dry runs
+4. Security audits
 
 ## Success Metrics
 

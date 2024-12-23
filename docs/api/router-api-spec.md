@@ -1,7 +1,21 @@
 # XRouter API Specification
 
 ## Overview
-XRouter предоставляет API для доступа к различным российским LLM провайдерам, управления моделями и мониторинга.
+XRouter предоставляет API для доступа к российским LLM провайдерам, управления моделями и мониторинга.
+
+## Release Plan
+
+### Release 1.0 (Current)
+- API key аутентификация
+- GigaChat интеграция
+- SQLite для хранения данных
+- Redis для rate limiting
+
+### Release 1.1 (Planned)
+- OAuth 2.0 с PKCE
+- YandexGPT интеграция
+- Миграция на PostgreSQL
+- Расширенное использование Redis
 
 ## Base URL
 ```
@@ -14,6 +28,8 @@ API использует Bearer token аутентификацию:
 Authorization: Bearer YOUR_API_KEY
 ```
 
+В Release 1.1 будет добавлена поддержка OAuth 2.0 с PKCE.
+
 ## Endpoints
 
 ### 1. Models
@@ -25,7 +41,9 @@ GET /v1/models
 
 #### Parameters
 - supported_parameters (query, optional): Фильтр по поддерживаемым параметрам
-- provider (query, optional): Фильтр по провайдеру (gigachat, yandexgpt)
+- provider (query, optional): Фильтр по провайдеру (gigachat, yandexgpt*)
+
+*YandexGPT будет доступен в Release 1.1
 
 #### Response
 ```typescript
@@ -33,8 +51,8 @@ interface ModelsResponse {
   data: {
     id: string;              // Например: "gigachat/pro"
     name: string;            // Человекочитаемое название
-    provider: string;        // "gigachat" | "yandexgpt"
-    version: string;         // Для YandexGPT: "latest" | "rc" | "deprecated"
+    provider: string;        // "gigachat" | "yandexgpt"*
+    version: string;         // Для YandexGPT*: "latest" | "rc" | "deprecated"
     created: number;         // Unix timestamp
     description: string;     // Описание модели
     pricing: {
@@ -62,6 +80,8 @@ interface ModelsResponse {
 }
 ```
 
+*Поля, связанные с YandexGPT, будут доступны в Release 1.1
+
 ### 2. Parameters
 ```http
 GET /v1/parameters/{modelId}
@@ -70,7 +90,9 @@ GET /v1/parameters/{modelId}
 Получение поддерживаемых параметров для модели.
 
 #### Parameters
-- modelId (path, required): ID модели (например, "gigachat/pro")
+- modelId (path, required): ID модели (например, "gigachat/pro", "yandexgpt-lite:latest"*)
+
+*YandexGPT модели будут доступны в Release 1.1
 
 #### Response
 ```typescript
@@ -113,13 +135,15 @@ interface GenerationResponse {
 ```
 
 ### 4. Authentication
+
+#### Get API Key Info
 ```http
 GET /v1/auth/key
 ```
 
 Проверка API ключа и получение информации о лимитах.
 
-#### Response
+##### Response
 ```typescript
 interface AuthKeyResponse {
   data: {
@@ -134,6 +158,40 @@ interface AuthKeyResponse {
   };
 }
 ```
+
+#### Create API Key
+```http
+POST /v1/auth/key
+```
+
+Создание нового API ключа.
+
+##### Request
+```typescript
+interface CreateKeyRequest {
+  label: string;           // Метка для ключа
+  expires_at?: string;     // Опционально: дата истечения
+}
+```
+
+##### Response
+```typescript
+interface CreateKeyResponse {
+  data: {
+    key: string;          // Новый API ключ
+    label: string;
+    created_at: string;
+    expires_at?: string;
+  };
+}
+```
+
+#### Revoke API Key
+```http
+DELETE /v1/auth/key/{keyId}
+```
+
+Отзыв API ключа.
 
 ### 5. Provider Status
 ```http
@@ -152,7 +210,8 @@ interface ProviderStatusResponse {
       success_rate: number;
       last_updated: string;
     };
-    yandexgpt: {
+    // Release 1.1
+    yandexgpt?: {
       status: "operational" | "degraded" | "down";
       latency: number;
       success_rate: number;
@@ -188,6 +247,7 @@ interface ErrorResponse {
 - 503: Service Unavailable
 
 ## Rate Limiting
+Rate limiting реализован с использованием Redis.
 
 ### Free tier
 - 20 req/min
@@ -199,7 +259,7 @@ interface ErrorResponse {
 
 ## Модели и провайдеры
 
-### GigaChat
+### Release 1.0 - GigaChat
 - GigaChat (Lite) - легкая модель для простых задач
 - GigaChat-Pro - продвинутая модель для сложных задач
 - GigaChat-Max - продвинутая модель для задач с высокими требованиями
@@ -208,7 +268,7 @@ interface ErrorResponse {
   - Поддержка: streaming, function calling, json mode
   - Нативная поддержка всех параметров
 
-### YandexGPT
+### Release 1.1 - YandexGPT
 - yandexgpt-lite - стандартная модель для задач в реальном времени
 - yandexgpt - продвинутая модель для сложных запросов
 - yandexgpt-32k - модель с расширенным контекстом
@@ -220,3 +280,25 @@ interface ErrorResponse {
   - Контекст: 8192 токенов (32k для yandexgpt-32k)
   - Поддержка: streaming, json mode
   - Эмуляция function calling через промпты
+
+## Хранение данных
+
+### Release 1.0
+- SQLite
+  - Хранение API ключей
+  - Статистика использования
+  - Логи генераций
+- Redis
+  - Rate limiting
+  - Кэширование API ключей
+  - Статусы провайдеров
+
+### Release 1.1
+- PostgreSQL
+  - Миграция с SQLite
+  - Улучшенная производительность
+  - Поддержка сложных запросов
+- Redis
+  - Расширенное кэширование
+  - Очереди задач
+  - Распределенные блокировки

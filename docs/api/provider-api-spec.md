@@ -1,5 +1,20 @@
 # Provider API Specification
 
+## Release Plan
+
+### Release 1.0 (Current)
+- OpenAI-совместимый API
+- GigaChat интеграция
+- Поддержка streaming
+- Function calling (нативно)
+- Мультимодальность (текст + изображения)
+
+### Release 1.1 (Planned)
+- YandexGPT интеграция
+- Поддержка версионирования моделей
+- Эмуляция function calling для YandexGPT
+- Расширенный контекст (32k токенов)
+
 ## Overview
 XRouter предоставляет OpenAI-совместимый API для доступа к различным российским LLM моделям. API построен по принципам REST и поддерживает как синхронные, так и streaming запросы.
 
@@ -31,7 +46,8 @@ interface ChatCompletionRequest {
   prompt?: string;            // Текстовый промпт (альтернатива messages)
 
   // Модель (обязательно)
-  model: string;              // ID модели (например, "gigachat-pro")
+  model: string;              // Release 1.0: "gigachat-lite" | "gigachat-pro" | "gigachat-max"
+                             // Release 1.1: "yandexgpt-lite" | "yandexgpt" | "yandexgpt-32k"
 
   // Базовые параметры (поддерживаются всеми провайдерами)
   temperature?: number;       // Диапазон: [0.0, 2.0], по умолчанию 1.0
@@ -123,7 +139,7 @@ interface ToolCall {
 
 ## Поддерживаемые модели
 
-### GigaChat
+### Release 1.0 - GigaChat
 - GigaChat (Lite) - легкая модель для простых задач
 - GigaChat-Pro - продвинутая модель для сложных задач
 - GigaChat-Max - продвинутая модель для задач с высокими требованиями
@@ -134,7 +150,7 @@ interface ToolCall {
 - Нативная поддержка function calling
 - Полная поддержка всех параметров
 
-### YandexGPT
+### Release 1.1 - YandexGPT (Planned)
 - yandexgpt-lite - стандартная модель
 - yandexgpt - продвинутая модель
 - yandexgpt-32k - модель с расширенным контекстом
@@ -151,17 +167,31 @@ interface ToolCall {
 
 ## Поддержка параметров провайдерами
 
-| Параметр | GigaChat | YandexGPT | Примечания |
-|----------|----------|-----------|------------|
-| temperature | ✅ | ✅ | |
-| max_tokens | ✅ | ✅ | |
-| stream | ✅ | ✅ | |
-| top_p | ✅ | ❌ | |
-| repetition_penalty | ✅ | ✅ | |
-| prompt | ✅* | ✅* | *Конвертируется в messages |
-| messages | ✅ | ✅ | |
-| tools | ✅ | ✅* | *Эмулируется через промпты |
-| tool_choice | ✅ | ✅* | *Эмулируется через промпты |
+### Release 1.0 - GigaChat
+| Параметр | Поддержка | Примечания |
+|----------|-----------|------------|
+| temperature | ✅ | |
+| max_tokens | ✅ | |
+| stream | ✅ | |
+| top_p | ✅ | |
+| repetition_penalty | ✅ | |
+| prompt | ✅ | Конвертируется в messages |
+| messages | ✅ | |
+| tools | ✅ | Нативная поддержка |
+| tool_choice | ✅ | |
+
+### Release 1.1 - YandexGPT (Planned)
+| Параметр | Поддержка | Примечания |
+|----------|-----------|------------|
+| temperature | ✅ | |
+| max_tokens | ✅ | |
+| stream | ✅ | |
+| top_p | ❌ | |
+| repetition_penalty | ✅ | |
+| prompt | ✅ | Конвертируется в messages |
+| messages | ✅ | |
+| tools | ✅ | Эмулируется через промпты |
+| tool_choice | ✅ | Эмулируется через промпты |
 
 ## Streaming
 

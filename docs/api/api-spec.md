@@ -1,7 +1,7 @@
 # XRouter API Specification
 
 ## Overview
-XRouter предоставляет API для работы с различными российскими LLM провайдерами. API разделен на две части:
+XRouter предоставляет API для работы с российскими LLM провайдерами. API разделен на две части:
 
 1. [Router API](router-api-spec.md) - эндпоинты для управления системой:
    - Получение списка моделей
@@ -22,14 +22,14 @@ https://api.xrouter.ru/v1
 ```
 
 ## Authentication
-API использует Bearer token аутентификацию:
+API использует API key аутентификацию через Bearer token:
 ```http
 Authorization: Bearer YOUR_API_KEY
 ```
 
 ## Поддерживаемые провайдеры
 
-### GigaChat
+### Release 1.0 - GigaChat
 - GigaChat (Lite) - легкая модель для простых задач
 - GigaChat-Pro - продвинутая модель для сложных задач
 - GigaChat-Max - продвинутая модель для задач с высокими требованиями
@@ -38,7 +38,9 @@ Authorization: Bearer YOUR_API_KEY
   - Поддержка: streaming, function calling, json mode
   - Нативная поддержка всех параметров
 
-### YandexGPT
+### Будущие релизы
+
+#### Release 1.1 - YandexGPT
 - yandexgpt-lite - стандартная модель для задач в реальном времени
 - yandexgpt - продвинутая модель для сложных запросов
 - yandexgpt-32k - модель с расширенным контекстом
@@ -53,8 +55,8 @@ Authorization: Bearer YOUR_API_KEY
 
 ## Поддержка параметров провайдерами
 
-| Параметр | GigaChat | YandexGPT | Примечания |
-|----------|----------|-----------|------------|
+| Параметр | GigaChat | YandexGPT* | Примечания |
+|----------|----------|------------|------------|
 | temperature | ✅ | ✅ | |
 | max_tokens | ✅ | ✅ | |
 | stream | ✅ | ✅ | |
@@ -64,6 +66,8 @@ Authorization: Bearer YOUR_API_KEY
 | messages | ✅ | ✅ | |
 | tools | ✅ | ✅* | *Эмулируется через промпты |
 | tool_choice | ✅ | ✅* | *Эмулируется через промпты |
+
+*YandexGPT будет доступен в Release 1.1
 
 ## Error Handling
 

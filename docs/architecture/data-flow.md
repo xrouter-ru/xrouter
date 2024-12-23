@@ -1,314 +1,351 @@
 # XRouter Data Flow Documentation
 
-## MVP (Python)
+## Release 1.0 - Foundation
 
 ### Request Flow
 ```mermaid
 sequenceDiagram
     participant Client
-    participant FastAPI as FastAPI Gateway
+    participant Gateway as API Gateway
     participant Router as Router Service
+    participant Usage as Usage Service
     participant Provider as Provider Manager
+    participant GigaChat
     participant Redis as Redis Cache
+    participant DB as SQLite
     
-    Client->>FastAPI: Send Request
-    FastAPI->>FastAPI: Validate Request
-    FastAPI->>FastAPI: Authenticate
-    FastAPI->>Redis: Check Rate Limit
+    Client->>Gateway: Send Request
+    Gateway->>Gateway: Validate Request
+    Gateway->>Gateway: Validate API Key
+    Gateway->>Redis: Check Rate Limit
     
     alt Rate Limit OK
-        FastAPI->>Router: Forward Request
-        Router->>Provider: Forward to Provider
-        Provider->>Provider: Transform Request
-        Provider->>LLM: Send to LLM
-        LLM-->>Provider: LLM Response
-        Provider->>Provider: Normalize Response
-        Provider-->>Router: Return Response
-        Router-->>FastAPI: Return Response
-        FastAPI-->>Client: Return Response
+        Gateway->>Router: Forward Request
+        Router->>Usage: Calculate Expected Tokens
+        Usage->>Usage: Estimate Cost
+        Usage->>Redis: Check Usage Limits
+        
+        alt Usage Limit OK
+            Router->>Provider: Forward to Provider
+            Provider->>GigaChat: Send Request
+            GigaChat-->>Provider: LLM Response
+            
+            Provider->>Usage: Record Actual Usage
+            Usage->>DB: Store Usage Record
+            Usage->>Redis: Update Usage Stats
+            
+            Provider-->>Router: Return Response
+            Router-->>Gateway: Return Response
+            Gateway-->>Client: Return Response
+        else Usage Limit Exceeded
+            Usage-->>Router: Limit Exceeded
+            Router-->>Gateway: Error Response
+            Gateway-->>Client: 402 Payment Required
+        end
     else Rate Limit Exceeded
-        Redis-->>FastAPI: Limit Exceeded
-        FastAPI-->>Client: 429 Too Many Requests
+        Redis-->>Gateway: Limit Exceeded
+        Gateway-->>Client: 429 Too Many Requests
     end
 ```
 
 ### Implementation Details
+
+#### API Gateway
 ```python
-# FastAPI Gateway
 from fastapi import FastAPI, HTTPException
 from redis import Redis
+from sqlite3 import connect
 
 app = FastAPI()
 redis = Redis()
+db = connect('xrouter.db')
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatRequest):
+    # API Key validation
+    if not validate_api_key(request.api_key):
+        raise HTTPException(401)
+    
     # Rate limiting
     if not check_rate_limit(request.api_key):
         raise HTTPException(429)
     
-    # Authentication
-    if not validate_api_key(request.api_key):
-        raise HTTPException(401)
+    # Usage check
+    usage = await usage_service.check_limits(request.api_key)
+    if not usage.allowed:
+        raise HTTPException(402)
     
     # Route request
     response = await router.process_request(request)
     return response
+```
 
-# Router Service
+#### Router Service
+```python
 class RouterService:
+    def __init__(self, provider_manager: ProviderManager, usage_service: UsageService):
+        self.provider_manager = provider_manager
+        self.usage_service = usage_service
+
     async def process_request(self, request: ChatRequest) -> ChatResponse:
-        provider = self.resolve_provider(request.model)
-        transformed = provider.transform_request(request)
-        response = await provider.execute(transformed)
+        # Calculate expected tokens
+        expected_tokens = await self.usage_service.calculate_tokens(request)
+        
+        # Check usage limits
+        if not await self.usage_service.check_limits(request.api_key, expected_tokens):
+            raise UsageLimitExceeded()
+        
+        # Get provider
+        provider = self.provider_manager.get_provider(request.model)
+        
+        # Execute request
+        response = await provider.execute(request)
+        
+        # Record actual usage
+        await self.usage_service.record_usage(Usage(
+            api_key=request.api_key,
+            provider=provider.name,
+            model=request.model,
+            tokens=response.usage,
+            cost=response.cost
+        ))
+        
         return response
+```
 
-# Provider Manager
+#### Provider Manager
+```python
 class ProviderManager:
+    def __init__(self, usage_service: UsageService):
+        self.usage_service = usage_service
+        self.gigachat_client = GigaChatClient()
+        self.metrics = MetricsClient()
+
+    def get_provider(self, model: str) -> Provider:
+        if model.startswith('gigachat'):
+            return self.gigachat_client
+        raise UnsupportedModelError(model)
+
     async def execute(self, request: ProviderRequest) -> ProviderResponse:
-        if request.model.startswith('gigachat'):
-            return await self.gigachat_client.complete(request)
-        elif request.model.startswith('yandexgpt'):
-            return await self.yandex_client.complete(request)
+        provider = self.get_provider(request.model)
+        
+        try:
+            # Execute request
+            response = await provider.complete(request)
+            
+            # Record metrics
+            await self.metrics.record_request(provider.name, request.model)
+            await self.metrics.record_tokens(
+                provider.name,
+                response.usage.input,
+                response.usage.output
+            )
+            
+            return response
+        except Exception as e:
+            await self.metrics.record_error(provider.name, str(e))
+            raise
+
+class GigaChatClient(Provider):
+    async def complete(self, request: ProviderRequest) -> ProviderResponse:
+        # Transform request for GigaChat
+        gigachat_request = self.transform_request(request)
+        
+        # Execute request
+        response = await self.client.create_completion(gigachat_request)
+        
+        # Transform response
+        return self.transform_response(response)
 ```
 
-## Production (Go)
+#### Usage Service
+```python
+class UsageService:
+    def __init__(self, db: Database, cache: Redis):
+        self.db = db
+        self.cache = cache
 
-### Request Flow
+    async def calculate_tokens(self, request: ChatRequest) -> TokenCount:
+        # Estimate input tokens
+        input_tokens = self.count_tokens(request.messages)
+        
+        # Estimate output tokens based on max_tokens or model defaults
+        output_tokens = request.max_tokens or self.get_default_max_tokens(request.model)
+        
+        return TokenCount(
+            input=input_tokens,
+            output=output_tokens,
+            total=input_tokens + output_tokens,
+            model=request.model
+        )
+
+    async def check_limits(self, api_key: str, expected_tokens: TokenCount) -> bool:
+        # Get current usage from cache
+        current = await self.cache.get(f"usage:{api_key}")
+        if current is None:
+            # If not in cache, get from DB
+            current = await self.db.get_usage(api_key)
+            await self.cache.set(f"usage:{api_key}", current)
+        
+        # Get limits
+        limits = await self.get_limits(api_key)
+        
+        # Check if would exceed
+        return (current + expected_tokens.total) <= limits.max_tokens
+
+    async def record_usage(self, usage: Usage):
+        # Store in DB
+        await self.db.insert_usage(usage)
+        
+        # Update cache
+        await self.cache.increment(f"usage:{usage.api_key}", usage.tokens.total)
+        
+        # Record metrics
+        await self.metrics.record_usage(usage)
+```
+
+### Data Storage
+
+#### SQLite Schema
+```sql
+-- API Keys
+CREATE TABLE api_keys (
+    id TEXT PRIMARY KEY,
+    key_hash TEXT NOT NULL,
+    name TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP,
+    last_used_at TIMESTAMP
+);
+
+-- Usage Records
+CREATE TABLE usage (
+    id TEXT PRIMARY KEY,
+    api_key_id TEXT REFERENCES api_keys(id),
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    tokens_input INTEGER NOT NULL,
+    tokens_output INTEGER NOT NULL,
+    cost DECIMAL(10,6) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Provider Status
+CREATE TABLE provider_status (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    status TEXT NOT NULL,
+    latency INTEGER,
+    error_rate DECIMAL(5,2),
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Redis Schema
+```python
+class RedisKeys:
+    # Rate Limiting
+    RATE_LIMIT = "rate:{api_key}:{window}"
+    
+    # Usage Stats
+    USAGE_COUNTER = "usage:{api_key}:counter"
+    USAGE_HISTORY = "usage:{api_key}:history"
+    
+    # Provider Status
+    PROVIDER_STATUS = "provider:{name}:status"
+    MODEL_STATUS = "model:{name}:status"
+```
+
+### Error Handling
+
+#### Error Types
+```python
+class ErrorCode(str, Enum):
+    AUTH_ERROR = "auth_error"
+    VALIDATION_ERROR = "validation_error"
+    RATE_LIMIT_ERROR = "rate_limit_error"
+    USAGE_LIMIT_ERROR = "usage_limit_error"
+    PROVIDER_ERROR = "provider_error"
+    INTERNAL_ERROR = "internal_error"
+
+class XRouterError(Exception):
+    def __init__(self, code: ErrorCode, message: str, details: dict = None):
+        self.code = code
+        self.message = message
+        self.details = details or {}
+```
+
+#### Error Flow
 ```mermaid
 sequenceDiagram
     participant Client
     participant Gateway as API Gateway
     participant Router as Router Service
-    participant Provider as Provider Manager
-    participant Redis as Redis Cache
-    participant DB as PostgreSQL
-    
-    Client->>Gateway: Send Request
-    Gateway->>Gateway: Validate Request
-    Gateway->>DB: Validate API Key
-    Gateway->>Redis: Check Rate Limit
-    
-    alt All Checks Pass
-        Gateway->>Router: Forward Request
-        Router->>Provider: Forward to Provider
-        Provider->>Provider: Transform Request
-        Provider->>LLM: Send to LLM
-        LLM-->>Provider: LLM Response
-        Provider->>Provider: Normalize Response
-        Provider-->>Router: Return Response
-        Router-->>Gateway: Return Response
-        Gateway-->>Client: Return Response
-    else Auth/Rate Limit Failed
-        Gateway-->>Client: Error Response
-    end
-```
-
-### Implementation Details
-```go
-// API Gateway
-type Gateway struct {
-    router  *Router
-    cache   *redis.Client
-    db      *sql.DB
-    metrics *prometheus.Client
-}
-
-func (g *Gateway) HandleRequest(w http.ResponseWriter, r *http.Request) {
-    // Validate request
-    if err := g.validateRequest(r); err != nil {
-        g.sendError(w, err)
-        return
-    }
-
-    // Check rate limit
-    if err := g.checkRateLimit(r); err != nil {
-        g.sendError(w, err)
-        return
-    }
-
-    // Process request
-    resp, err := g.router.ProcessRequest(r.Context(), r)
-    if err != nil {
-        g.sendError(w, err)
-        return
-    }
-
-    g.sendResponse(w, resp)
-}
-
-// Router Service
-type Router struct {
-    providers map[string]Provider
-    metrics   *prometheus.Client
-}
-
-func (r *Router) ProcessRequest(ctx context.Context, req *Request) (*Response, error) {
-    // Resolve provider
-    provider, err := r.resolveProvider(req.Model)
-    if err != nil {
-        return nil, err
-    }
-
-    // Transform and execute
-    transformed := provider.TransformRequest(req)
-    return provider.Execute(ctx, transformed)
-}
-
-// Provider Manager
-type Provider interface {
-    TransformRequest(*Request) *ProviderRequest
-    Execute(context.Context, *ProviderRequest) (*Response, error)
-}
-
-type GigaChatProvider struct {
-    client *gigachat.Client
-}
-
-type YandexGPTProvider struct {
-    client *yandexgpt.Client
-}
-```
-
-## Error Handling
-
-### Error Types
-```go
-type ErrorCode string
-
-const (
-    ErrAuthentication ErrorCode = "auth_error"
-    ErrValidation    ErrorCode = "validation_error"
-    ErrRateLimit     ErrorCode = "rate_limit_error"
-    ErrProvider      ErrorCode = "provider_error"
-    ErrInternal      ErrorCode = "internal_error"
-)
-
-type Error struct {
-    Code    ErrorCode
-    Message string
-    Details map[string]interface{}
-}
-```
-
-### Error Flow
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Gateway as API Gateway
-    participant Router as Router Service
+    participant Usage as Usage Service
     participant Provider as Provider Manager
     
     Client->>Gateway: Request
-    Gateway->>Router: Forward Request
-    Router->>Provider: Process Request
-    Provider->>Provider: Error Occurs
-    Provider-->>Router: Return Error
-    Router-->>Gateway: Return Error
-    Gateway-->>Client: Error Response with Details
+    
+    alt Auth Error
+        Gateway-->>Client: 401 Unauthorized
+    else Rate Limit Error
+        Gateway-->>Client: 429 Too Many Requests
+    else Usage Limit Error
+        Usage-->>Router: Usage Exceeded
+        Router-->>Gateway: Error Response
+        Gateway-->>Client: 402 Payment Required
+    else Provider Error
+        Provider-->>Router: Provider Error
+        Router-->>Gateway: Error Response
+        Gateway-->>Client: 502 Bad Gateway
+    end
 ```
 
-## Monitoring
+### Monitoring
 
-### Metrics Collection
-```go
-type Metrics interface {
-    RecordRequest(provider, model string)
-    RecordLatency(provider string, duration time.Duration)
-    RecordError(provider string, err error)
-    RecordTokens(provider string, input, output int)
-}
+#### Metrics Collection
+```python
+class Metrics:
+    async def record_request(self, provider: str, model: str):
+        await self.increment_counter("requests_total", {"provider": provider, "model": model})
+    
+    async def record_tokens(self, provider: str, input_tokens: int, output_tokens: int):
+        await self.increment_counter("tokens_total", {
+            "provider": provider,
+            "type": "input"
+        }, input_tokens)
+        await self.increment_counter("tokens_total", {
+            "provider": provider,
+            "type": "output"
+        }, output_tokens)
+    
+    async def record_cost(self, provider: str, cost: float):
+        await self.increment_counter("cost_total", {"provider": provider}, cost)
 ```
 
-### Metric Flow
+#### Metric Flow
 ```mermaid
 sequenceDiagram
     participant Service
+    participant Usage as Usage Service
     participant Metrics as Prometheus
     participant Grafana
     
-    Service->>Metrics: Record Metric
+    Service->>Metrics: Record Request
+    Usage->>Metrics: Record Tokens
+    Usage->>Metrics: Record Cost
     Grafana->>Metrics: Query Metrics
     Note over Grafana: Display Dashboard
 ```
 
-## OAuth Flow
+## Release 1.1 - Enhancement (Planned)
 
-### MVP OAuth (Python)
-```python
-from fastapi import FastAPI, Depends
-from fastapi.security import OAuth2AuthorizationCodeBearer
-from fastapi_oauth2 import OAuth2
+### Additional Components
 
-# OAuth2 configuration
-oauth2_scheme = OAuth2AuthorizationCodeBearer(
-    tokenUrl="token",
-    authorizationUrl="authorize"
-)
+1. OAuth Service
+2. YandexGPT Provider
+3. PostgreSQL Migration
+4. Enhanced Monitoring
 
-@app.post("/token")
-async def token(code: str, code_verifier: str):
-    # Validate PKCE
-    if not validate_pkce(code, code_verifier):
-        raise HTTPException(400)
-    
-    # Generate token (1 year)
-    token = create_jwt_token(
-        user_id=user.id,
-        expires_delta=timedelta(days=365)
-    )
-    
-    return {"access_token": token}
-```
-
-### Production OAuth (Go)
-```go
-import (
-    "github.com/golang-jwt/jwt/v5"
-)
-
-type OAuthHandler struct {
-    db      *sql.DB
-    cache   *redis.Client
-}
-
-func (h *OAuthHandler) HandleToken(w http.ResponseWriter, r *http.Request) {
-    // Validate PKCE
-    code := r.FormValue("code")
-    verifier := r.FormValue("code_verifier")
-    
-    if !validatePKCE(code, verifier) {
-        http.Error(w, "Invalid code", 400)
-        return
-    }
-    
-    // Generate JWT (1 year)
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-        "sub": userID,
-        "exp": time.Now().AddDate(1, 0, 0).Unix(),
-    })
-    
-    tokenString, _ := token.SignedString(jwtSecret)
-    json.NewEncoder(w).Encode(map[string]string{
-        "access_token": tokenString,
-    })
-}
-```
-
-### OAuth Flow Diagram
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Auth as Auth Service
-    participant DB as Database
-    
-    Client->>Auth: Authorization Request + PKCE
-    Auth->>DB: Validate Client
-    DB-->>Auth: Client Valid
-    Auth-->>Client: Authorization Code
-    
-    Client->>Auth: Token Request + Code Verifier
-    Auth->>Auth: Validate PKCE
-    Auth->>Auth: Generate JWT (1 year)
-    Auth-->>Client: Access Token
-```
+Detailed implementation will be added when Release 1.1 development begins.

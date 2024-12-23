@@ -1,5 +1,68 @@
 # XRouter Components Documentation
 
+## Release Plan
+
+### Release 1.0 - Foundation
+```mermaid
+graph TD
+    Client[Client Applications] --> Gateway[API Gateway]
+    Gateway --> Auth[API Key Auth]
+    Gateway --> Router[Router Service]
+    Router --> Provider[Provider Manager]
+    Router --> Usage[Usage Service]
+    Provider --> GigaChat[GigaChat Adapter]
+    Provider --> Usage
+    Router --> Monitor[Monitoring]
+    Auth --> Redis[(Redis)]
+    Usage --> Redis
+    Usage --> SQLite[(SQLite)]
+    Monitor --> SQLite
+    
+    subgraph "Core Services"
+        Gateway
+        Router
+        Provider
+        Usage
+        Monitor
+    end
+    
+    subgraph "Storage"
+        Redis
+        SQLite
+    end
+```
+
+### Release 1.1 - Enhancement (Planned)
+```mermaid
+graph TD
+    Client[Client Applications] --> Gateway[API Gateway]
+    Gateway --> Auth[OAuth Service]
+    Gateway --> Router[Router Service]
+    Router --> Provider[Provider Manager]
+    Router --> Usage[Usage Service]
+    Provider --> GigaChat[GigaChat Adapter]
+    Provider --> YandexGPT[YandexGPT Adapter]
+    Provider --> Usage
+    Router --> Monitor[Monitoring]
+    Auth --> Redis[(Redis)]
+    Usage --> Redis
+    Usage --> Postgres[(PostgreSQL)]
+    Monitor --> Postgres
+    
+    subgraph "Core Services"
+        Gateway
+        Router
+        Provider
+        Usage
+        Monitor
+    end
+    
+    subgraph "Storage"
+        Redis
+        Postgres
+    end
+```
+
 ## Core Services
 
 ### 1. API Gateway Service
@@ -11,6 +74,17 @@ interface APIGateway {
   handleRateLimit(key: string): Promise<RateLimitResult>;
 }
 ```
+
+#### Release Support
+- Release 1.0: 
+  * Basic request validation
+  * API key authentication
+  * Rate limiting
+  * Request logging
+- Release 1.1:
+  * OAuth 2.0 with PKCE
+  * Enhanced validation
+  * Advanced rate limiting
 
 #### Key Features
 - Request validation and sanitization
@@ -46,6 +120,16 @@ interface ModelInfo {
 }
 ```
 
+#### Release Support
+- Release 1.0:
+  * GigaChat routing
+  * Basic model listing
+  * Request/response transformation
+- Release 1.1:
+  * YandexGPT routing
+  * Version support
+  * Enhanced transformation
+
 #### Key Features
 - Model resolution to provider
 - Request transformation
@@ -78,9 +162,19 @@ interface Provider {
 }
 ```
 
+#### Release Support
+- Release 1.0:
+  * GigaChat adapter
+  * Basic health checks
+  * Error handling
+- Release 1.1:
+  * YandexGPT adapter
+  * Advanced health monitoring
+  * Enhanced error handling
+
 #### Provider Adapters
 
-##### GigaChat Adapter
+##### GigaChat Adapter (Release 1.0)
 ```typescript
 class GigaChatAdapter implements Provider {
   capabilities: {
@@ -95,20 +189,17 @@ class GigaChatAdapter implements Provider {
 }
 ```
 
-##### YandexGPT Adapter
+##### YandexGPT Adapter (Release 1.1)
 ```typescript
 class YandexGPTAdapter implements Provider {
   capabilities: {
     supportedModels: [
-      // Lite версии
       'yandexgpt-lite:latest',
       'yandexgpt-lite:rc',
       'yandexgpt-lite:deprecated',
-      // Pro версии
       'yandexgpt:latest',
       'yandexgpt:rc',
       'yandexgpt:deprecated',
-      // 32k версии
       'yandexgpt-32k:latest',
       'yandexgpt-32k:rc',
       'yandexgpt-32k:deprecated'
@@ -141,8 +232,17 @@ interface OAuthService {
 }
 ```
 
+#### Release Support
+- Release 1.0:
+  * API key validation
+  * Basic token management
+  * Rate limit enforcement
+- Release 1.1:
+  * OAuth 2.0 with PKCE
+  * Enhanced token management
+  * Permission management
+
 #### Key Features
-- OAuth 2.0 with PKCE implementation
 - API key management
 - Token validation and refresh
 - Permission management
@@ -171,6 +271,16 @@ interface CacheConfig {
   monitoringTTL: number;    // TTL для метрик и статусов (минуты)
 }
 ```
+
+#### Release Support
+- Release 1.0:
+  * Rate limiting
+  * API key caching
+  * Basic provider status
+- Release 1.1:
+  * Enhanced caching
+  * Session management
+  * Distributed locking
 
 #### Key Features
 
@@ -235,6 +345,16 @@ interface ProviderStatus {
 }
 ```
 
+#### Release Support
+- Release 1.0:
+  * Basic metrics
+  * Error tracking
+  * Provider status
+- Release 1.1:
+  * Advanced metrics
+  * Detailed analytics
+  * SLA monitoring
+
 #### Key Features
 - Performance metrics collection
 - Error tracking and reporting
@@ -252,9 +372,359 @@ interface ProviderStatus {
 
 ---
 
+### 7. Usage Service
+```typescript
+interface UsageService {
+  // Подсчет токенов и стоимости
+  calculateTokens(request: Request): Promise<TokenCount>;
+  calculateCost(tokens: TokenCount, model: string): Promise<Cost>;
+  
+  // Запись использования
+  recordUsage(usage: Usage): Promise<void>;
+  recordBatchUsage(usages: Usage[]): Promise<void>;
+  
+  // Получение статистики
+  getUsageByApiKey(apiKey: string, period?: Period): Promise<UsageStats>;
+  getUsageByModel(model: string, period?: Period): Promise<UsageStats>;
+  getProviderUsage(provider: string, period?: Period): Promise<UsageStats>;
+  
+  // Проверка лимитов
+  checkLimit(apiKey: string): Promise<LimitCheck>;
+  reserveQuota(apiKey: string, tokens: TokenCount): Promise<QuotaReservation>;
+  releaseQuota(reservation: QuotaReservation): Promise<void>;
+}
+
+interface TokenCount {
+  input: number;
+  output: number;
+  total: number;
+  model: string;
+}
+
+interface Cost {
+  amount: number;
+  currency: string;
+  breakdown: {
+    input: number;
+    output: number;
+    markup?: number;
+  };
+}
+
+interface Usage {
+  id: string;
+  apiKey: string;
+  provider: string;
+  model: string;  // Включая версию, например "yandexgpt-lite:latest"
+  tokens: TokenCount;
+  cost: Cost;
+  metadata?: {
+    request_id?: string;
+    user_id?: string;
+    tags?: string[];
+  };
+  timestamp: Date;
+}
+
+interface UsageStats {
+  total_tokens: TokenCount;
+  total_cost: Cost;
+  request_count: number;
+  average_latency: number;
+  error_rate: number;
+  usage_by_day: {
+    date: string;
+    tokens: TokenCount;
+    cost: Cost;
+  }[];
+}
+
+interface LimitCheck {
+  allowed: boolean;
+  current_usage: number;
+  limit: number;
+  reset_at: Date;
+  warnings?: string[];
+}
+
+interface QuotaReservation {
+  id: string;
+  apiKey: string;
+  tokens: TokenCount;
+  expires_at: Date;
+}
+```
+
+#### Release Support
+- Release 1.0:
+  * Базовый подсчет токенов
+  * Запись использования в SQLite
+  * Простая проверка лимитов
+  * Базовая статистика
+- Release 1.1:
+  * Расширенная статистика
+  * Поддержка тегов и метаданных
+  * Квоты и резервирование
+  * Агрегация по пользователям
+
+#### Key Features
+- Точный подсчет токенов и стоимости
+- Детальная история использования
+- Гибкая система лимитов и квот
+- Кэширование статистики
+- Агрегация по разным измерениям
+
+#### Dependencies
+- Router Service (для получения информации о запросах)
+- Provider Manager (для получения результатов использования)
+- Auth Service (для проверки API ключей)
+- Cache Service (для кэширования статистики)
+- Database Service (для хранения истории)
+
+#### Implementation Details
+
+##### Token Calculation
+```typescript
+class TokenCalculator {
+  async calculateTokens(request: Request, model: string): Promise<TokenCount> {
+    const provider = await this.providerManager.getProvider(model);
+    return provider.calculateTokens(request);
+  }
+
+  async calculateCost(tokens: TokenCount, model: string): Promise<Cost> {
+    const pricing = await this.getPricing(model);
+    return {
+      amount: (tokens.input * pricing.input_rate) +
+              (tokens.output * pricing.output_rate),
+      currency: pricing.currency,
+      breakdown: {
+        input: tokens.input * pricing.input_rate,
+        output: tokens.output * pricing.output_rate
+      }
+    };
+  }
+}
+```
+
+##### Usage Recording
+```typescript
+class UsageRecorder {
+  async recordUsage(usage: Usage): Promise<void> {
+    // Записываем в БД
+    await this.db.insertUsage(usage);
+    
+    // Обновляем кэш
+    await this.cache.incrementUsage(usage.apiKey, usage.tokens);
+    
+    // Отправляем метрики
+    await this.monitoring.recordMetric({
+      name: 'token_usage',
+      value: usage.tokens.total,
+      tags: {
+        api_key: usage.apiKey,
+        model: usage.model,
+        provider: usage.provider
+      }
+    });
+  }
+}
+```
+
+##### Limit Checking
+```typescript
+class LimitChecker {
+  async checkLimit(apiKey: string): Promise<LimitCheck> {
+    // Проверяем кэш
+    const cached = await this.cache.getUsage(apiKey);
+    if (cached) {
+      return this.validateLimit(cached);
+    }
+
+    // Если нет в кэше, считаем из БД
+    const usage = await this.db.calculateUsage(apiKey);
+    await this.cache.setUsage(apiKey, usage);
+    
+    return this.validateLimit(usage);
+  }
+
+  private validateLimit(usage: number): LimitCheck {
+    const limit = this.getLimitForKey(usage.apiKey);
+    return {
+      allowed: usage < limit,
+      current_usage: usage,
+      limit: limit,
+      reset_at: this.getNextReset()
+    };
+  }
+}
+```
+
+---
+
+## Request Flow
+
+### Chat Completion Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway as API Gateway
+    participant Router as Router Service
+    participant Usage as Usage Service
+    participant Provider as Provider Manager
+    participant GigaChat
+    participant DB as SQLite/PostgreSQL
+    participant Cache as Redis
+
+    Client->>Gateway: POST /v1/chat/completions
+    
+    Gateway->>Gateway: Validate request
+    Gateway->>Gateway: Authenticate API key
+    
+    Gateway->>Router: Route request
+    Router->>Usage: Calculate tokens
+    Usage->>Usage: Estimate token count
+    Usage->>Usage: Calculate cost
+    
+    Usage->>Cache: Check rate limits
+    Usage->>Cache: Check usage limits
+    
+    Usage->>Usage: Reserve quota
+    
+    Router->>Provider: Forward request
+    Provider->>GigaChat: Execute request
+    GigaChat-->>Provider: Response
+    
+    Provider->>Usage: Record actual usage
+    Usage->>DB: Store usage record
+    Usage->>Cache: Update usage stats
+    
+    Provider-->>Router: Transformed response
+    Router-->>Gateway: Final response
+    Gateway-->>Client: HTTP response
+```
+
+### Процесс обработки запроса
+
+1. Входящий запрос (API Gateway)
+   - Валидация формата запроса
+   - Проверка API ключа
+   - Rate limiting через Redis
+
+2. Предварительная обработка (Router Service)
+   - Определение модели и провайдера
+   - Проверка доступности провайдера
+   - Подготовка запроса к трансформации
+
+3. Проверка и резервирование квоты (Usage Service)
+   - Подсчет ожидаемых токенов
+   - Расчет предполагаемой стоимости
+   - Проверка лимитов пользователя
+   - Резервирование квоты
+
+4. Выполнение запроса (Provider Manager)
+   - Трансформация запроса для провайдера
+   - Отправка запроса провайдеру
+   - Получение ответа
+   - Обработка ошибок
+
+5. Учет использования (Usage Service)
+   - Подсчет фактических токенов
+   - Расчет итоговой стоимости
+   - Запись использования в БД
+   - Обновление статистики в кэше
+
+6. Формирование ответа (Router Service)
+   - Нормализация ответа провайдера
+   - Добавление метаданных использования
+   - Обработка ошибок
+
+### Обработка ошибок
+
+1. Ошибки валидации
+   ```typescript
+   interface ValidationError {
+     code: 400;
+     message: string;
+     details: {
+       field: string;
+       error: string;
+     }[];
+   }
+   ```
+
+2. Ошибки лимитов
+   ```typescript
+   interface LimitError {
+     code: 429;
+     message: string;
+     details: {
+       current_usage: number;
+       limit: number;
+       reset_at: string;
+     };
+   }
+   ```
+
+3. Ошибки провайдера
+   ```typescript
+   interface ProviderError {
+     code: 502;
+     message: string;
+     details: {
+       provider: string;
+       raw_error: string;
+     };
+   }
+   ```
+
+---
+
 ## Database Schema
 
-### Users Table
+### Release 1.0 - SQLite Schema
+
+#### API Keys Table
+```sql
+CREATE TABLE api_keys (
+  id TEXT PRIMARY KEY,
+  key_hash TEXT NOT NULL,
+  name TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP,
+  last_used_at TIMESTAMP
+);
+```
+
+#### Usage Table
+```sql
+CREATE TABLE usage (
+  id TEXT PRIMARY KEY,
+  api_key_id TEXT REFERENCES api_keys(id),
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  tokens_input INTEGER NOT NULL,
+  tokens_output INTEGER NOT NULL,
+  cost DECIMAL(10,6) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Provider Status Table
+```sql
+CREATE TABLE provider_status (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  status TEXT NOT NULL,
+  latency INTEGER,
+  error_rate DECIMAL(5,2),
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Release 1.1 - PostgreSQL Schema
+
+#### Users Table
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY,
@@ -264,7 +734,7 @@ CREATE TABLE users (
 );
 ```
 
-### API Keys Table
+#### API Keys Table
 ```sql
 CREATE TABLE api_keys (
   id UUID PRIMARY KEY,
@@ -278,7 +748,7 @@ CREATE TABLE api_keys (
 );
 ```
 
-### Usage Table
+#### Usage Table
 ```sql
 CREATE TABLE usage (
   id UUID PRIMARY KEY,
@@ -293,7 +763,7 @@ CREATE TABLE usage (
 );
 ```
 
-### Provider Status Table
+#### Provider Status Table
 ```sql
 CREATE TABLE provider_status (
   id UUID PRIMARY KEY,
@@ -310,18 +780,17 @@ CREATE TABLE provider_status (
 
 ## Service Communication
 
-### Internal Communication
+### Release 1.0
 - REST APIs between services
+- Redis pub/sub for rate limiting
+- SQLite for persistent storage
+- Basic logging
+
+### Release 1.1 (Planned)
+- Enhanced REST APIs
 - gRPC for high-performance internal communication
-- Redis pub/sub for real-time updates
 - PostgreSQL for persistent storage
 - Redis for caching and session management
-
-### External Communication
-- REST APIs for client communication
-- WebSocket for streaming responses
-- HTTPS for secure communication
-- OAuth 2.0 for authentication
 
 ### Message Formats
 ```typescript
