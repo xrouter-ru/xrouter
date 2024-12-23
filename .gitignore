@@ -63,6 +63,17 @@ log/
 # Redis
 dump.rdb
 
+# Poetry
+poetry.lock
+
 # System
 .DS_Store
 Thumbs.db
+
+# Alembic
+migrations/versions/*
+!migrations/versions/.gitkeep
+
+# Local development
+.python-version
+.direnv/
