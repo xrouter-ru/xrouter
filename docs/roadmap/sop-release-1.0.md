@@ -728,7 +728,7 @@
           self.database = app.database
           self.cache = app.cache
           self.metrics = app.metrics
-          
+
           # Request-scoped services
           self.rate_limiter = RateLimiter(
               redis_client=self.cache,
@@ -743,7 +743,7 @@
   def setup_di(app: FastAPI, settings: Settings) -> None:
       """Setup dependency injection for FastAPI application."""
       app_container = ApplicationContainer(settings)
-      
+
       # Register dependencies
       app.dependency_overrides.update({
           Settings: lambda: app_container.config,
