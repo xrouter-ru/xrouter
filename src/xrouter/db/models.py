@@ -1,10 +1,10 @@
-"""Database models for the xrouter application."""
+"""Core database models for the xrouter application."""
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, Integer, Numeric, String, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -25,28 +25,13 @@ class APIKey(Base):
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
-    # Relationships
-    usage_records: Mapped[list["Usage"]] = relationship(back_populates="api_key")
-
-
-class Usage(Base):
-    """Model for tracking API usage."""
-
-    __tablename__ = "usage"
-
-    id: Mapped[UUID] = mapped_column(primary_key=True)
-    api_key_id: Mapped[UUID] = mapped_column(ForeignKey("api_keys.id"))
-    provider: Mapped[str] = mapped_column(String(50), nullable=False)
-    model: Mapped[str] = mapped_column(String(50), nullable=False)
-    tokens_input: Mapped[int] = mapped_column(Integer, nullable=False)
-    tokens_output: Mapped[int] = mapped_column(Integer, nullable=False)
-    cost: Mapped[float] = mapped_column(Numeric(10, 6), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+    # Balance tracking
+    current_balance: Mapped[float] = mapped_column(
+        Numeric(10, 2), nullable=False, default=0
     )
-
-    # Relationships
-    api_key: Mapped[APIKey] = relationship(back_populates="usage_records")
+    credit_limit: Mapped[float] = mapped_column(
+        Numeric(10, 2), nullable=False, default=500.00
+    )
 
 
 class ProviderStatus(Base):
