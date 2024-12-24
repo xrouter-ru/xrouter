@@ -82,7 +82,7 @@ OpenRouter strives to provide access to every potentially useful text-based AI m
 Explore and browse 290 models via the website, or via our API:
 
 OpenRouter Models API
- 1.0.0 
+ 1.0.0
 OAS 3.1
 This API lets you query models supported by OpenRouter.
 
@@ -103,7 +103,7 @@ string
 temperature,top_p,tools
 Responses
 Code	Description	Links
-200	
+200
 200 OK
 
 Media type
@@ -144,7 +144,7 @@ Schema
   ]
 }
 No links
-400	
+400
 400 Bad Request
 
 Media type
@@ -203,9 +203,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "order": [
@@ -231,9 +231,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "order": [
@@ -263,9 +263,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "require_parameters": true
@@ -297,9 +297,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "data_collection": "deny"
@@ -327,9 +327,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "allow_fallbacks": false
@@ -356,9 +356,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "openai/gpt-4o",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "ignore": [
@@ -404,9 +404,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "meta-llama/llama-3.1-8b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "quantizations": [
@@ -668,7 +668,7 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
     "messages": [
       {"role": "system", "content": "You are a helpful assistant."},
       {"role": "user", "content": "Hello!"},
-      
+
     ],
   })
 });
@@ -907,9 +907,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Who are you?"},
-      
+
     ],
   })
 });
@@ -937,7 +937,7 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Who are you?"},
       {"role": "assistant", "content": "I'm not sure, but my best guess is"},
     ],
@@ -1610,7 +1610,7 @@ Invalid schema: The model will return an error if your JSON Schema is invalidPar
 You can use the Parameter API to get the list of supported parameters and a sample value for a model.
 
 OpenRouter Parameters API
- 1.0.0 
+ 1.0.0
 OAS 3.1
 This API lets you query the top LLM sampling parameter configurations used by users on OpenRouter.
 
@@ -1643,7 +1643,7 @@ Available values : OpenAI, Anthropic, Google, Google AI Studio, Amazon Bedrock, 
 OpenAI
 Responses
 Code	Description	Links
-200	
+200
 200 OK
 
 Media type
@@ -1685,7 +1685,7 @@ Schema
   }
 }
 No links
-404	
+404
 404 Not Found
 
 Media type

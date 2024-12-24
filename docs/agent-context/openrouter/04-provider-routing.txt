@@ -33,9 +33,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "order": [
@@ -61,9 +61,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "order": [
@@ -93,9 +93,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "require_parameters": true
@@ -127,9 +127,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "data_collection": "deny"
@@ -157,9 +157,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "mistralai/mixtral-8x7b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "allow_fallbacks": false
@@ -186,9 +186,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "openai/gpt-4o",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "ignore": [
@@ -234,9 +234,9 @@ fetch("https://openrouter.ai/api/v1/chat/completions", {
   body: JSON.stringify({
     "model": "meta-llama/llama-3.1-8b-instruct",
     "messages": [
-      
+
       {"role": "user", "content": "Hello"},
-      
+
     ],
     "provider": {
       "quantizations": [

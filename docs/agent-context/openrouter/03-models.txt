@@ -4,7 +4,7 @@ OpenRouter strives to provide access to every potentially useful text-based AI m
 Explore and browse 290 models via the website, or via our API:
 
 OpenRouter Models API
- 1.0.0 
+ 1.0.0
 OAS 3.1
 This API lets you query models supported by OpenRouter.
 
@@ -25,7 +25,7 @@ string
 temperature,top_p,tools
 Responses
 Code	Description	Links
-200	
+200
 200 OK
 
 Media type
@@ -66,7 +66,7 @@ Schema
   ]
 }
 No links
-400	
+400
 400 Bad Request
 
 Media type

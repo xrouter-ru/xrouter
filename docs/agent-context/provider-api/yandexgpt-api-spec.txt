@@ -117,7 +117,7 @@ import argparse
 
 URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
-def run(iam_token, folder_id, user_text):    
+def run(iam_token, folder_id, user_text):
     # Собираем запрос
     data = {}
     # Указываем тип модели
@@ -129,7 +129,7 @@ def run(iam_token, folder_id, user_text):
         {"role": "system", "text": "Исправь ошибки в тексте."},
         {"role": "user", "text": f"{user_text}"},
     ]
-    
+
     # Отправляем запрос
     response = requests.post(
         URL,
@@ -212,7 +212,7 @@ def run(iam_token, folder_id, user_text):
     request = service_pb.CompletionRequest(
         model_uri=f"gpt://{folder_id}/yandexgpt",
         completion_options=pb.CompletionOptions(
-            max_tokens={"value": 2000}, 
+            max_tokens={"value": 2000},
             temperature={"value": 0.5}
         ),
     )
@@ -284,15 +284,15 @@ def run(iam_token, folder_id, user_text):
         message_system = request.messages.add()
         message_system.role = "system"
         message_system.text = "Исправь ошибки в тексте."
-    
+
         message_user = request.messages.add()
         message_user.role = "user"
         message_user.text = user_text
-    
+
         it = stub.Completion(request, metadata=(
             ('authorization', f'Bearer {iam_token}'),
-        ))             
-        
+        ))
+
         for response in it:
             print(response)
 
@@ -336,7 +336,7 @@ Yandex Cloud
       "text": "Ты умный ассистент"
     },
     {
-      "role": "user", 
+      "role": "user",
       "text": "Привет! Какими науками занимался Альберт Эйнштейн?"
     }
   ]
@@ -402,15 +402,15 @@ IAM_TOKEN — IAM-токен вашего аккаунта.
       "text": "Ты умный ассистент"
     },
     {
-      "role": "user", 
+      "role": "user",
       "text": "Привет! Какими науками занимался Альберт Эйнштейн?"
     },
     {
-      "role": "assistant", 
+      "role": "assistant",
       "text": "Альберт Эйнштейн был выдающимся физиком, труды которого в области теоретической физики, теоретической механики и философии науки стали фундаментальными. Он посвятил свою карьеру изучению основ Вселенной, включая теорию относительности, специальную и общую теорию относительности. Кроме того, Альберт Эйнштейн изучал:\n\n* термодинамику,\n* статистическую механику,\n* электромагнетизм,\n* квантовую теорию,\n* специальную теорию относительности и др.\n\nЕго работы по общей теории относительности получили широкое признание и оказали глубокое влияние на развитие современной физики."
     },
     {
-      "role": "user", 
+      "role": "user",
       "text": "Какие важные открытия он совершил?"
     }
   ]
@@ -435,15 +435,15 @@ IAM_TOKEN — IAM-токен вашего аккаунта.
       "text": "Ты умный ассистент"
     },
     {
-      "role": "user", 
+      "role": "user",
       "text": "Привет! Какими науками занимался Альберт Эйнштейн?"
     },
     {
-      "role": "assistant", 
+      "role": "assistant",
       "text": "Альберт Эйнштейн был выдающимся физиком, труды которого в области теоретической физики, теоретической механики и философии науки стали фундаментальными. Он посвятил свою карьеру изучению основ Вселенной, включая теорию относительности, специальную и общую теорию относительности. Кроме того, Альберт Эйнштейн изучал:\n\n* термодинамику,\n* статистическую механику,\n* электромагнетизм,\n* квантовую теорию,\n* специальную теорию относительности и др.\n\nЕго работы по общей теории относительности получили широкое признание и оказали глубокое влияние на развитие современной физики."
     },
     {
-      "role": "user", 
+      "role": "user",
       "text": "Какие важные открытия он совершил?"
     },
     {
@@ -759,7 +759,7 @@ def main() -> None:
 
     # Определяем модель YandexGPT Pro RC и ее максимальный контекст
     model = sdk.models.completions(
-        "yandexgpt", 
+        "yandexgpt",
         version="rc",
         max_tokens=500
     )
@@ -775,7 +775,7 @@ def main() -> None:
     # Здесь нужно предусмотреть чтение сообщений пользователей
     # Пока же мы просто запишем что-нибудь в тред
     thread.write("Представьте, что это сообщения пользователя")
-    
+
     # Можно посмотреть, что хранится в треде
     for message in thread:
         print(f"    {message=}")
@@ -784,22 +784,22 @@ def main() -> None:
     # Так можно отдать модели все содержимое треда
     run = assistant.run(thread)
     print(f"{run=}")
-    
-    # Чтобы получить результат, нужно дождаться окончания запуска   
+
+    # Чтобы получить результат, нужно дождаться окончания запуска
     result = run.wait()
-    
+
     # Можно посмотреть все поля результата
     print(f"run {result=}")
-    
+
     # В поле text сохраняется удобная для дальнейшей работы строка
     print(result.text)
-    
+
     thread.write("А это новое сообщение пользователя")
     # Создадим новый запуск, с учетом предыдущих сообщений пользователя и прошлого ответа модели
     run = assistant.run(thread)
     result = run.wait()
     print(result.text)
-    
+
     # Удаляем все ненужное
     thread.delete()
     assistant.delete()
@@ -881,7 +881,7 @@ def main() -> None:
 
     # Создадим инструмент для работы с поисковым индексом. Или даже с несколькими индексами, если бы их было больше.
     tool = sdk.tools.search_index(search_index)
-    
+
     # Создадим ассистента для модели YandexGPT Pro Latest
     # Он будет использовать инструмент поискового индекса
     assistant = sdk.assistants.create('yandexgpt', tools=[tool])

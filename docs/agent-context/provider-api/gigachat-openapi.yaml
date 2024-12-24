@@ -7,7 +7,7 @@ info:
     url: 'https://developers.sber.ru/portal/products/gigachat-api'
     email: gigachat@sberbank.ru
   description: |
-  
+
     Справочная документация по REST API нейросетевой модели GigaChat.
 
     О стоимости и условиях использования GigaChat API вы можете узнать в разделе [Тарифы и оплата](/ru/gigachat/api/tariffs).
@@ -16,7 +16,7 @@ info:
 
     Запросы к GigaChat API передаются по адресу `https://gigachat.devices.sberbank.ru/` и авторизуются с помощью токена доступа по протоколу [OAuth 2.0](https://tools.ietf.org/html/rfc6749).
     Токен доступа передается в заголовке `Authorization`:
-    
+
     ```sh
     curl -L -X GET 'https://gigachat.devices.sberbank.ru/api/v1/models' \
     -H 'Accept: application/json' \
@@ -24,12 +24,12 @@ info:
     ```
 
     :::tip
-    
+
     Вы также можете передавать запросы к [моделям в раннем доступе](/ru/gigachat/models/preview-models).
     Их возможности могут отличаться от моделей, доступных в промышленном контуре.
 
     Для обращения к моделям в раннем доступе передавайте запросы по адресу `https://gigachat-preview.devices.sberbank.ru/`.
-    
+
     :::
 
     Чтобы получить токен, отправьте запрос [POST /api/v2/oauth](/ru/gigachat/api/reference/rest/post-token):
@@ -117,7 +117,7 @@ paths:
               schema:
                type: object
                properties:
-                  scope: 
+                  scope:
                     description: |
                       Версия API. Возможные значения:
 
@@ -293,14 +293,14 @@ paths:
         ```mdx-code-block
         </APITable>
         ```
-        
+
         </TabItem>
         <TabItem value="image" label="Изображения" >
 
         ```mdx-code-block
         <APITable colsWidth={['200px']}>
         ```
-        
+
         | Формат | MIME-тип   |
         |--------|------------|
         | jpg    | image/jpg  |
@@ -311,7 +311,7 @@ paths:
         ```mdx-code-block
         </APITable>
         ```
-        
+
         </TabItem>
         </Tabs>
 
@@ -353,7 +353,7 @@ paths:
             Содержится в ответе модели, в теге `<img>`, в атрибуте `src`.
 
             Подробнее в разделе [Генерация изображений](/ru/gigachat/api/images-generation).
-          schema:  
+          schema:
             type: string
           in: path
           required: true
@@ -386,7 +386,7 @@ paths:
         Изображения создаются с помощью запроса [POST /chat/completions](/ru/gigachat/api/reference/rest/post-chat).
 
         Подробнее читайте в разделе [Создание изображений](/ru/gigachat/api/images-generation).
-        
+
         :::note
 
         Консоль запроса отключена из-за бинарного формата ответа.
@@ -459,9 +459,9 @@ paths:
         Для этого передайте список идентификаторов файлов в массиве `attachments`.
         В одном сообщении (объект в массиве `messages`) можно передать только одно изображение.
         В одном запросе можно передать до 10 изображений, независимо от количества сообщений.
-        
+
         :::note
-        
+
         При этом общий размер запроса должен быть меньше 20 Мб.
 
         Например, ваш запрос может включать текст промпта и два идентификатора изображений, которые ссылаются на файлы размерами 6 Мб и 12 Мб.
@@ -569,7 +569,7 @@ components:
             properties:
               usage:
                 type: string
-                description: Название модели, например, GigaChat или embeddings. 
+                description: Название модели, например, GigaChat или embeddings.
                 example: GigaChat
               value:
                 type: integer
@@ -602,7 +602,7 @@ components:
           description: |
             Идентификатор файла, который можно использовать при [запросах на генерацию](/ru/gigachat/api/reference/rest/post-chat).
             Для этого идентификаторы нужно передать в массиве `attachments`.
-            
+
             Подробнее — в разделе [Обработка файлов](/ru/gigachat/api/working-with-files).
           type: string
           format: uuidv4
@@ -621,14 +621,14 @@ components:
           type: string
           description: |
             Доступность файла возможные значения:
-            
+
             * `public`;
             * `private`.
           example: private
           default: private
           enum:
             - public
-            - private  
+            - private
     Files:
       description: Массив объектов с данными доступных файлов
       required:
@@ -682,7 +682,7 @@ components:
           enum:
             - public
             - private
-          description: Доступность файла       
+          description: Доступность файла
     FileId:
       required:
         - file_id
@@ -721,7 +721,7 @@ components:
             * `auto` — в зависимости от содержимого запроса, модель решает сгенерировать сообщение или вызвать функцию.
             Модель вызывает встроенные функции, если отсутствует массив `functions` с описанием пользовательских функций.
             Если запрос содержит `"function_call": "auto"` и массив `functions` с описанием пользовательских функций, модель будет генерировать аргументы для описанных функций и не сможет вызвать встроенные функции независимо от содержимого запроса;
-            
+
             * `{"name": "название_функции"}` — принудительная генерация аргументов для указанной функции. Вы можете явно задать часть аргументов с помощью объекта `partial_arguments`. Остальные аргументы модель сгенерирует самостоятельно. При принудительной генерации, массив `functions` обязан содержать объект с описанием указанной функции. В противном случае вернется ошибка.
           oneOf:
             - $ref: '#/components/schemas/function_call_custom_function'
@@ -823,7 +823,7 @@ components:
           format: float
           description: |
             Количество повторений слов:
-            
+
             * Значение 1.0 — нейтральное значение.
             * При значении больше 1 модель будет стараться не повторять слова.
 
@@ -872,7 +872,7 @@ components:
             Возвращается в ответе модели (сообщение с `"role": "assistant"`) при вызове встроенных или собственных функций.
             Позволяет сохранить [контекст вызова функции](/ru/gigachat/api/function-calling#sohranenie-konteksta) и повысить качество работы модели.
             Для этого нужно передать идентификатор в запросе на генерацию в сообщении с ролью `assistant`.
-            
+
             Поле заменяет массив `data_for_context` и является целевым решением для работы с функциями.
 
             Сейчас поле работает только при обращении к [моделям в раннем доступе](/ru/gigachat/models/preview-models).
@@ -889,7 +889,7 @@ components:
             В одной сессии можно передать до 10 изображений.
 
             :::note
-            
+
             При этом общий размер запроса должен быть меньше 20 Мб.
 
             Например, ваш запрос может включать текст промпта и два идентификатора изображений, которые ссылаются на файлы размерами 6 Мб и 12 Мб.
@@ -900,7 +900,7 @@ components:
           type: array
           items:
             type: string
-            example: 
+            example:
              - e7f0b84b-3d4f-4c2c-ac31-8855b1b0db0a
     MessagesRes:
       type: object
@@ -931,12 +931,12 @@ components:
             Возвращается в ответе модели (сообщение с `"role": "assistant"`) при вызове встроенных или собственных функций.
             Позволяет сохранить [контекст вызова функции](/ru/gigachat/api/function-calling#sohranenie-konteksta) и повысить качество работы модели.
             Для этого нужно передать идентификатор в запросе на генерацию в сообщении с ролью `assistant`.
-            
+
             Поле заменяет массив `data_for_context` и является целевым решением для работы с функциями.
 
             Сейчас поле работает только при обращении к [моделям в раннем доступе](/ru/gigachat/models/preview-models).
           example: 77d3fb14-457a-46ba-937e-8d856156d003
-        function_call: 
+        function_call:
           type: object
           properties:
             name:
@@ -1000,7 +1000,7 @@ components:
       type: object
       properties:
         message:
-          $ref: '#/components/schemas/MessagesRes'    
+          $ref: '#/components/schemas/MessagesRes'
         index:
           format: int32
           type: integer
@@ -1009,13 +1009,13 @@ components:
         finish_reason:
           description: |
             Причина завершения гипотезы. Возможные значения:
-            
+
             * `stop` — модель закончила формировать гипотезу и вернула полный ответ;
             * `length` — достигнут лимит токенов в сообщении;
             * `function_call` — указывает, что при запросе была вызвана встроенная функция или сгенерированы аргументы для пользовательской функции;
             * `blacklist` — запрос попадает под [тематические ограничения](/ru/gigachat/limitations#tematicheskie-ogranicheniya-zaprosov).
             * `error` — ответ модели содержит невалидные аргументы пользовательской функции.
-            
+
           type: string
           enum:
             - stop
@@ -1081,7 +1081,7 @@ components:
                 default: embedding
               embedding:
                 type: array
-                description: Массив чисел, представляющих значения эмбеддинга для предоставленного текста. 
+                description: Массив чисел, представляющих значения эмбеддинга для предоставленного текста.
                 items:
                   type: integer
                   format: float
@@ -1144,17 +1144,17 @@ components:
           type: string
           description: Название функции.
           example: sbermarket-pizza_order
-        partial_arguments: 
+        partial_arguments:
           type: object
           description: JSON-объект в котором вы можете явно задать некоторые аргументы указанной функции. Остальные аргументы модель сгенерирует самостоятельно.
           properties: {}
     function_call_none_auto:
       type: string
-      enum: 
+      enum:
         - auto
         - none
-      description: Режим работы с функциями  
-      example: auto 
+      description: Режим работы с функциями
+      example: auto
   responses:
     AuthUnauthorizedError:
       description: Ошибка авторизации.

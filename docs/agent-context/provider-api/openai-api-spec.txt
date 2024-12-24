@@ -3,7 +3,7 @@ Given a list of messages comprising a conversation, the model will return a resp
 
 Create chat completion
 post
- 
+
 https://api.openai.com/v1/chat/completions
 Creates a model response for the given chat conversation. Learn more in the text generation, vision, and audio guides.
 

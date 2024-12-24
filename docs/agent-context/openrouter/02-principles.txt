@@ -15,4 +15,3 @@ Consolidated Billing. Simple and transparent billing, regardless of how many pro
 Higher Availability. Fallback providers, and automatic, smart routing means your requests still work even when providers go down.
 
 Higher Rate Limits. OpenRouter works directly with providers to provide better rate limits and more throughput.
-
